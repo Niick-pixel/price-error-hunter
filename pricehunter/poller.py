@@ -1,0 +1,246 @@
+import random
+import threading
+import time
+import traceback
+
+from . import amazon, config, creators, scoring, scraper, sources, store
+
+
+class Poller:
+    """Background refresh loop with jitter, conditional GETs and backoff."""
+
+    def __init__(self):
+        self.scraper = scraper.Scraper()
+        self.checker = amazon.AmazonChecker()
+        self.api = creators.Client()
+        self._wake = threading.Event()
+        self._stop = threading.Event()
+        self._thread = None
+        self._lock = threading.Lock()
+        self.status = {
+            "last_run": None,
+            "last_ok": None,
+            "next_run": None,
+            "last_error": None,
+            "cycles": 0,
+            "unchanged_streak": 0,
+            "new_since_open": 0,
+            "top_new": None,
+            "running": False,
+            "amazon_error": None,
+            "source_errors": None,
+        }
+        self._backoff = 0.0
+
+    def start(self):
+        self._thread = threading.Thread(target=self._loop, daemon=True)
+        self._thread.start()
+
+    def stop(self):
+        self._stop.set()
+        self._wake.set()
+
+    def refresh_now(self):
+        """Ask for an out-of-band cycle. Honours min_interval regardless."""
+        cfg = config.load()
+        last = self.status["last_run"]
+        if last and time.time() - last < cfg["min_interval"]:
+            return {
+                "ok": False,
+                "wait": round(cfg["min_interval"] - (time.time() - last), 1),
+            }
+        self._wake.set()
+        return {"ok": True}
+
+    def _loop(self):
+        while not self._stop.is_set():
+            delay = self._run_cycle()
+            self.status["next_run"] = time.time() + delay
+            self._wake.wait(delay)
+            self._wake.clear()
+
+    def _run_cycle(self):
+        cfg = config.load()
+        self.status["running"] = True
+        self.status["last_run"] = time.time()
+        try:
+            cold_start = store.deal_count() == 0
+            fresh = []
+
+            items, changed = self.scraper.fetch_listing()
+            if changed:
+                fresh += store.upsert_listing(items, source="hiddenclearances")
+                self.status["unchanged_streak"] = 0
+            else:
+                self.status["unchanged_streak"] += 1
+
+            # Extra feeds run every cycle, independently of the main listing's
+            # 304 handling, and one failing feed must not stop the others.
+            fresh += self._fetch_sources(cfg)
+
+            # Score from feed data first so the limited detail budget is spent on
+            # the most promising deals, then score again once details are in.
+            self._rescore()
+            self._fetch_details(cfg)
+            self._backfill_targets(cfg)
+            self._rescore()
+            self._check_amazon(cfg)
+            self._note_new(fresh, alert=not cold_start)
+
+            self.status["last_ok"] = time.time()
+            self.status["last_error"] = None
+            self._backoff = 0.0
+        except scraper.Blocked as exc:
+            self._backoff = max(exc.retry_after or 0, min(max(self._backoff * 2, 60), 900))
+            self.status["last_error"] = "Rate limited - backing off"
+        except Exception as exc:  # network hiccups shouldn't kill the loop
+            self._backoff = min(max(self._backoff * 2, 30), 600)
+            self.status["last_error"] = f"{type(exc).__name__}: {exc}"
+            traceback.print_exc()
+        finally:
+            self.status["running"] = False
+            self.status["cycles"] += 1
+
+        if self._backoff:
+            return self._backoff
+
+        base = max(cfg["poll_interval"], cfg["min_interval"])
+        # Back off gently while nothing is changing, so a quiet feed isn't polled
+        # at the same rate as a busy one.
+        if self.status["unchanged_streak"] >= 3:
+            base *= min(1 + 0.25 * (self.status["unchanged_streak"] - 2), 3.0)
+        return base * (1 + random.uniform(-cfg["jitter"], cfg["jitter"]))
+
+    def _fetch_details(self, cfg):
+        for deal_id in store.pending_detail_ids(cfg["max_details_per_cycle"]):
+            if self._stop.is_set():
+                return
+            deal = store.get(deal_id)
+            if not deal:
+                continue
+            try:
+                detail = self.scraper.fetch_detail(deal["url"])
+                store.save_detail(
+                    deal_id, detail["description"], detail["out_url"], detail["image"]
+                )
+                self._resolve_target(deal_id, detail["out_url"])
+            except scraper.Blocked:
+                raise
+            except Exception:
+                store.save_detail(deal_id, "", "", "", ok=False)
+
+    def _fetch_sources(self, cfg):
+        """Poll the extra RSS feeds, isolating failures per source."""
+        fresh = []
+        errors = []
+        for source in sources.ALL:
+            if not cfg.get(f"source_{source.name}", True):
+                continue
+            try:
+                items = source.fetch(self.scraper.session, cfg["request_timeout"])
+                fresh += store.upsert_listing(items, source=source.name)
+            except Exception as exc:
+                errors.append(f"{source.label}: {type(exc).__name__}")
+        self.status["source_errors"] = errors or None
+        return fresh
+
+    def _backfill_targets(self, cfg):
+        """Resolve destinations for deals whose details predate this feature."""
+        for deal_id in store.pending_target_ids(cfg["max_details_per_cycle"]):
+            if self._stop.is_set():
+                return
+            deal = store.get(deal_id)
+            if deal:
+                self._resolve_target(deal_id, deal["out_url"])
+
+    def _resolve_target(self, deal_id, out_url):
+        """Follow the affiliate hops once so links go straight to the retailer."""
+        if not out_url:
+            return
+        try:
+            final = self.scraper.resolve_target(out_url)
+        except Exception:
+            return
+        if final:
+            store.save_target(deal_id, final, scraper.extract_asin(final))
+
+    def _check_amazon(self, cfg):
+        """Prefer the official API; fall back to best-effort scraping."""
+        if creators.configured():
+            self._check_amazon_api()
+        elif cfg["amazon_live_check"]:
+            self._check_amazon_scrape(cfg)
+
+    def _check_amazon_api(self):
+        deal_ids = store.amazon_candidates(10)
+        if not deal_ids:
+            return
+        deals = [d for d in (store.get(i) for i in deal_ids) if d]
+        try:
+            results = self.api.get_items([d["asin"] for d in deals])
+        except creators.CreatorsError as exc:
+            self.status["amazon_error"] = f"{exc.code}: {exc.message}"
+            return
+        except Exception as exc:
+            self.status["amazon_error"] = f"{type(exc).__name__}: {exc}"
+            return
+
+        self.status["amazon_error"] = None
+        for deal in deals:
+            result = results.get(deal["asin"])
+            if not result:
+                continue
+            tag, note = amazon.verdict(deal["price"], result, deal["list_price"])
+            store.save_amazon(deal["id"], result, tag, note)
+            # The API's detail page URL carries the user's own associate tag,
+            # which Amazon requires us to use once we're pulling their data.
+            if result.get("detail_url"):
+                store.save_target(deal["id"], result["detail_url"], deal["asin"])
+
+    def _check_amazon_scrape(self, cfg):
+        for deal_id in store.amazon_candidates(2):
+            if self._stop.is_set():
+                return
+            deal = store.get(deal_id)
+            if not deal:
+                continue
+            result = self.checker.check(deal["asin"], cfg)
+            if result.get("status") == "capped":
+                return
+            tag, note = amazon.verdict(deal["price"], result, deal["list_price"])
+            store.save_amazon(deal_id, result, tag, note)
+
+    def _rescore(self):
+        for deal in store.list_deals(limit=500):
+            value, tier, reasons = scoring.score(deal)
+            if value != deal.get("score") or tier != deal.get("tier"):
+                store.save_score(deal["id"], value, tier, reasons)
+
+    def _note_new(self, fresh_ids, alert=True):
+        # First populate: everything is "new", so an alert would be noise.
+        if not fresh_ids or not alert:
+            return
+        cfg = config.load()
+        best = None
+        for deal_id in fresh_ids:
+            deal = store.get(deal_id)
+            if deal and (best is None or deal["score"] > best["score"]):
+                best = deal
+        self.status["new_since_open"] += len(fresh_ids)
+        if best and best["score"] >= cfg["alert_score"]:
+            self.status["top_new"] = {
+                "title": best["title"],
+                "score": best["score"],
+                "id": best["id"],
+            }
+            if cfg["sound_alerts"]:
+                _beep()
+
+
+def _beep():
+    try:
+        import winsound
+
+        winsound.MessageBeep(winsound.MB_ICONEXCLAMATION)
+    except Exception:
+        pass

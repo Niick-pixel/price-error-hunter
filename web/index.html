@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Price Error Hunter</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body data-token="__TOKEN__">
+
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">◆</span>
+    <div>
+      <h1>Price Error Hunter</h1>
+      <p class="sub" id="feedline">Watching Hidden Clearances</p>
+    </div>
+  </div>
+
+  <div class="status" id="status">
+    <div class="pulse" id="pulse"></div>
+    <div class="statustext">
+      <strong id="nextrun">—</strong>
+      <span id="laststate">starting up</span>
+    </div>
+    <button id="refresh" class="btn">Refresh now</button>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button class="tab active" data-view="feed">
+    <span class="tabname">Deals Feed</span>
+    <span class="tabcount" id="count-feed">—</span>
+  </button>
+  <button class="tab" data-view="amazon">
+    <span class="tabname">Amazon</span>
+    <span class="tabcount" id="count-amazon">—</span>
+  </button>
+</nav>
+
+<section class="controls">
+  <div class="filters">
+    <label class="field">
+      <span>Min discount</span>
+      <select id="mindiscount">
+        <option value="0">Any</option>
+        <option value="40">40%+</option>
+        <option value="60">60%+</option>
+        <option value="75">75%+</option>
+        <option value="90">90%+</option>
+      </select>
+    </label>
+    <label class="field">
+      <span>Sort by</span>
+      <select id="sort">
+        <option value="score">Price-error score</option>
+        <option value="newest">Newest</option>
+        <option value="discount">Biggest discount</option>
+        <option value="savings">Largest saving</option>
+      </select>
+    </label>
+    <label class="field">
+      <span>Check every</span>
+      <select id="interval">
+        <option value="120">2 min</option>
+        <option value="180">3 min</option>
+        <option value="300">5 min</option>
+        <option value="600">10 min</option>
+        <option value="1800">30 min</option>
+      </select>
+    </label>
+    <label class="toggle">
+      <input type="checkbox" id="sound">
+      <span>Sound alert</span>
+    </label>
+    <label class="toggle amazonopt hidden">
+      <input type="checkbox" id="livecheck">
+      <span>Live Amazon check</span>
+    </label>
+  </div>
+  <div class="counts" id="counts"></div>
+</section>
+
+<p id="amazonnote" class="note hidden"></p>
+
+<div id="alert" class="alert hidden"></div>
+
+<main id="grid" class="grid"></main>
+<p id="empty" class="empty">Loading the deal feed…</p>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

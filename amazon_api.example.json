@@ -1,0 +1,7 @@
+{
+  "_comment": "Amazon Creators API credentials. Copy to data/amazon_api.json and fill in your own values. Never commit it - data/ is gitignored.",
+  "client_id": "YOUR_CLIENT_ID",
+  "client_secret": "YOUR_CLIENT_SECRET",
+  "partner_tag": "yourtag-20",
+  "marketplace": "www.amazon.com"
+}

@@ -1,0 +1,201 @@
+"""Additional deal feeds, so discounts are found independently of one site.
+
+Both feeds here are public RSS and cost one request per poll. Amazon itself is
+never scraped: CamelCamelCamel already tracks Amazon prices and publishes the
+biggest drops, ASIN included, which is exactly the signal a price-error hunt
+needs.
+"""
+
+import re
+import time
+from email.utils import parsedate_to_datetime
+from xml.etree import ElementTree
+
+from bs4 import BeautifulSoup
+
+from . import scraper
+
+CAMEL_FEED = "https://camelcamelcamel.com/top_drops/feed"
+SLICKDEALS_FEED = (
+    "https://slickdeals.net/newsearch.php"
+    "?mode=frontpage&searcharea=deals&searchin=first&rss=1"
+)
+
+# "Product Name - down 12.45% ($4.12) to $28.98 from $33.10"
+CAMEL_TITLE = re.compile(
+    r"^(?P<name>.+?)\s+-\s+down\s+(?P<pct>[\d.]+)%\s+"
+    r"\(\$(?P<save>[\d,.]+)\)\s+to\s+\$(?P<now>[\d,.]+)\s+from\s+\$(?P<was>[\d,.]+)\s*$",
+    re.I,
+)
+CAMEL_ASIN = re.compile(r"/product/([A-Za-z0-9]{10})")
+
+RETAILER_TAG = re.compile(r"\[([a-z0-9.-]+\.[a-z]{2,})\]", re.I)
+PRICE = re.compile(r"\$\s?([\d,]+(?:\.\d{2})?)")
+PCT_OFF = re.compile(r"(\d{1,2}(?:\.\d+)?)\s*%\s*off", re.I)
+WAS_PRICE = re.compile(
+    r"(?:was|reg(?:ularly)?\.?|orig(?:inally)?\.?|list(?:\s+price)?|down\s+from)"
+    r"\s*\$\s?([\d,]+(?:\.\d{2})?)",
+    re.I,
+)
+
+
+def _num(text):
+    try:
+        return float(str(text).replace(",", ""))
+    except (TypeError, ValueError):
+        return None
+
+
+def _age_text(pub_date):
+    """RSS gives an absolute date; the UI wants '12 min ago'."""
+    if not pub_date:
+        return ""
+    try:
+        stamp = parsedate_to_datetime(pub_date).timestamp()
+    except (TypeError, ValueError):
+        return ""
+    minutes = max(0, int((time.time() - stamp) / 60))
+    if minutes < 1:
+        return "just now"
+    if minutes < 60:
+        return f"{minutes} min ago"
+    if minutes < 1440:
+        return f"{minutes // 60} hr ago"
+    return f"{minutes // 1440} days ago"
+
+
+def _items(xml):
+    """Parse an RSS document.
+
+    These are XML, so they are parsed with ElementTree rather than an HTML
+    parser - the HTML path mangles CDATA descriptions and drops <link> text.
+    """
+    try:
+        root = ElementTree.fromstring(xml.encode("utf-8"))
+    except ElementTree.ParseError:
+        return
+
+    for node in root.iter("item"):
+        def text(tag):
+            found = node.find(tag)
+            return (found.text or "").strip() if found is not None else ""
+
+        description = text("description")
+        if "<" in description:
+            # Descriptions carry escaped HTML; flatten it to plain text.
+            description = " ".join(
+                BeautifulSoup(description, "html.parser").get_text(" ").split()
+            )
+        yield {
+            "title": text("title"),
+            "link": text("link"),
+            "description": description,
+            "pub_date": text("pubDate"),
+        }
+
+
+class CamelTopDrops:
+    """Biggest recent Amazon price drops, straight from CamelCamelCamel."""
+
+    name = "camelcamelcamel"
+    label = "Camel top drops"
+
+    def fetch(self, session, timeout):
+        resp = session.get(CAMEL_FEED, timeout=timeout)
+        resp.raise_for_status()
+        out = []
+        for entry in _items(resp.text):
+            match = CAMEL_TITLE.match(entry["title"])
+            asin_match = CAMEL_ASIN.search(entry["link"])
+            if not match or not asin_match:
+                continue
+            price = _num(match.group("now"))
+            was = _num(match.group("was"))
+            if price is None or was is None:
+                continue
+            asin = asin_match.group(1)
+            out.append({
+                "id": scraper.deal_id(entry["link"]),
+                "url": entry["link"],
+                "title": match.group("name").strip(),
+                "retailer": "Amazon",
+                "price": price,
+                "list_price": was,
+                "discount_pct": _num(match.group("pct")) or 0.0,
+                "savings": _num(match.group("save")) or round(was - price, 2),
+                "image": "",
+                "age_text": _age_text(entry["pub_date"]),
+                "asin": asin,
+                "direct_url": f"https://www.amazon.com/dp/{asin}",
+                # ASIN and prices are already known, so no detail page is needed.
+                "detail_state": 1,
+            })
+        return out
+
+
+class Slickdeals:
+    """Community-vetted front page deals across many retailers."""
+
+    name = "slickdeals"
+    label = "Slickdeals"
+
+    def fetch(self, session, timeout):
+        resp = session.get(SLICKDEALS_FEED, timeout=timeout)
+        resp.raise_for_status()
+        out = []
+        for entry in _items(resp.text):
+            title, desc = entry["title"], entry["description"]
+            if not title or not entry["link"]:
+                continue
+
+            price = _num(PRICE.search(title).group(1)) if PRICE.search(title) else None
+            if price is None and PRICE.search(desc):
+                price = _num(PRICE.search(desc).group(1))
+            if price is None:
+                continue
+
+            blob = f"{title} {desc}"
+            list_price = None
+            was = WAS_PRICE.search(blob)
+            if was:
+                list_price = _num(was.group(1))
+
+            discount = None
+            pct = PCT_OFF.search(blob)
+            if pct:
+                discount = _num(pct.group(1))
+
+            # Slickdeals often quotes "on sale for $49.99 - 50% off"; the higher
+            # of the two prices in the description is the pre-discount figure.
+            if list_price is None and discount:
+                candidates = [_num(m) for m in PRICE.findall(desc)]
+                highest = max([c for c in candidates if c] or [0])
+                if highest > price:
+                    list_price = highest
+            if list_price and price and discount is None:
+                discount = round((1 - price / list_price) * 100, 1)
+
+            retailer = "Unknown"
+            tag = RETAILER_TAG.search(desc)
+            if tag:
+                retailer = tag.group(1).split(".")[0].replace("-", " ").title()
+
+            out.append({
+                "id": scraper.deal_id(entry["link"]),
+                "url": entry["link"],
+                "title": title,
+                "retailer": retailer,
+                "price": price,
+                "list_price": list_price,
+                "discount_pct": discount or 0.0,
+                "savings": round(list_price - price, 2) if list_price else 0.0,
+                "image": "",
+                "age_text": _age_text(entry["pub_date"]),
+                "asin": "",
+                "direct_url": "",
+                "detail_state": 1,
+            })
+        return out
+
+
+ALL = (CamelTopDrops(), Slickdeals())
