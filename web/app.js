@@ -67,6 +67,11 @@ function buildCard(deal) {
     image.loading = "lazy";
     // Some retailers block hotlinking; drop the node rather than show a broken icon.
     image.onerror = () => image.remove();
+    // Amazon answers unknown ASINs with a 1px placeholder that "loads" fine but
+    // renders as an empty box, so treat anything tiny as no image at all.
+    image.onload = () => {
+      if (image.naturalWidth < 32 || image.naturalHeight < 32) image.remove();
+    };
     thumb.append(image);
   }
   const badge = el("span", `badge ${deal.tier || "normal"}`, `${Math.round(deal.score)} · ${TIER_LABEL[deal.tier] || "DEAL"}`);

@@ -29,6 +29,16 @@ CAMEL_TITLE = re.compile(
 )
 CAMEL_ASIN = re.compile(r"/product/([A-Za-z0-9]{10})")
 
+CONTENT_ENCODED = "{http://purl.org/rss/1.0/modules/content/}encoded"
+IMG_SRC = re.compile(r"<img[^>]+src=[\"']([^\"']+)[\"']", re.I)
+# Slickdeals spells out the product URL, which gives us the ASIN for free.
+AMAZON_DP = re.compile(r"amazon\.com/(?:dp|gp/product)/([A-Z0-9]{10})", re.I)
+
+
+def amazon_image(asin):
+    """Amazon's public image-by-ASIN endpoint; no product page fetch needed."""
+    return f"https://m.media-amazon.com/images/P/{asin}.01._SCLZZZZZZZ_.jpg"
+
 RETAILER_TAG = re.compile(r"\[([a-z0-9.-]+\.[a-z]{2,})\]", re.I)
 PRICE = re.compile(r"\$\s?([\d,]+(?:\.\d{2})?)")
 PCT_OFF = re.compile(r"(\d{1,2}(?:\.\d+)?)\s*%\s*off", re.I)
@@ -80,7 +90,18 @@ def _items(xml):
             found = node.find(tag)
             return (found.text or "").strip() if found is not None else ""
 
-        description = text("description")
+        raw_description = text("description")
+        # Thumbnails live in the namespaced <content:encoded> block, not in
+        # <description>, so both are searched for an <img>.
+        content = text(CONTENT_ENCODED)
+        image = ""
+        for blob in (content, raw_description):
+            found = IMG_SRC.search(blob or "")
+            if found:
+                image = found.group(1)
+                break
+
+        description = raw_description
         if "<" in description:
             # Descriptions carry escaped HTML; flatten it to plain text.
             description = " ".join(
@@ -90,6 +111,7 @@ def _items(xml):
             "title": text("title"),
             "link": text("link"),
             "description": description,
+            "image": image,
             "pub_date": text("pubDate"),
         }
 
@@ -123,7 +145,7 @@ class CamelTopDrops:
                 "list_price": was,
                 "discount_pct": _num(match.group("pct")) or 0.0,
                 "savings": _num(match.group("save")) or round(was - price, 2),
-                "image": "",
+                "image": entry["image"] or amazon_image(asin),
                 "age_text": _age_text(entry["pub_date"]),
                 "asin": asin,
                 "direct_url": f"https://www.amazon.com/dp/{asin}",
@@ -180,6 +202,14 @@ class Slickdeals:
             if tag:
                 retailer = tag.group(1).split(".")[0].replace("-", " ").title()
 
+            # Posts usually spell out the product URL, so Amazon items can join
+            # the Amazon tab with a chart and a direct link like any other.
+            asin = ""
+            found = AMAZON_DP.search(blob)
+            if found:
+                asin = found.group(1).upper()
+                retailer = "Amazon"
+
             out.append({
                 "id": scraper.deal_id(entry["link"]),
                 "url": entry["link"],
@@ -189,10 +219,10 @@ class Slickdeals:
                 "list_price": list_price,
                 "discount_pct": discount or 0.0,
                 "savings": round(list_price - price, 2) if list_price else 0.0,
-                "image": "",
+                "image": entry["image"] or (amazon_image(asin) if asin else ""),
                 "age_text": _age_text(entry["pub_date"]),
-                "asin": "",
-                "direct_url": "",
+                "asin": asin,
+                "direct_url": f"https://www.amazon.com/dp/{asin}" if asin else "",
                 "detail_state": 1,
             })
         return out
