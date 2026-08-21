@@ -3,7 +3,7 @@ import sqlite3
 import threading
 import time
 
-from . import config
+from . import config, scoring
 
 _local = threading.local()
 
@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
 # Columns added after the first release; applied to existing databases on open.
 MIGRATIONS = (
     ("source", "TEXT DEFAULT 'hiddenclearances'"),
+    ("posted_at", "REAL"),
     ("direct_url", "TEXT"),
     ("asin", "TEXT"),
     ("amz_price", "REAL"),
@@ -55,7 +56,37 @@ def _migrate(db):
     for name, coltype in MIGRATIONS:
         if name not in have:
             db.execute(f"ALTER TABLE deals ADD COLUMN {name} {coltype}")
+    # Backfill rows that predate posted_at. age_text was written at last_seen,
+    # so measuring back from there recovers a real posting time; rows whose age
+    # will not parse fall back to when we first saw them.
+    # posted_at = first_seen also catches rows written by an earlier, cruder
+    # backfill. Only a positive parsed age is applied, so this converges after
+    # one pass instead of drifting forward on every start.
+    pending = db.execute(
+        "SELECT id, age_text, first_seen, last_seen, posted_at FROM deals"
+        " WHERE posted_at IS NULL OR posted_at = first_seen"
+    ).fetchall()
+    for row in pending:
+        minutes = scoring.age_minutes(row["age_text"])
+        if minutes:
+            posted = (row["last_seen"] or row["first_seen"]) - minutes * 60
+        elif row["posted_at"] is None:
+            posted = row["first_seen"]
+        else:
+            continue  # already correct; leave it alone
+        db.execute("UPDATE deals SET posted_at=? WHERE id=?", (posted, row["id"]))
     db.commit()
+
+
+def _posted_at(age_text, now):
+    """Turn '12 min ago' into an absolute timestamp.
+
+    Sorting on first_seen is unreliable because a cold start inserts every deal
+    in one cycle, leaving them all tied. Every feed reports an age, so derive a
+    real posting time from it instead.
+    """
+    minutes = scoring.age_minutes(age_text)
+    return now - minutes * 60 if minutes is not None else now
 
 
 def conn():
@@ -106,12 +137,13 @@ def upsert_listing(items, source="hiddenclearances"):
             db.execute(
                 "INSERT INTO deals (id, url, title, retailer, price, list_price,"
                 " discount_pct, savings, image, age_text, first_seen, last_seen,"
-                " source, asin, direct_url, detail_state)"
-                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                " posted_at, source, asin, direct_url, detail_state)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     item["id"], item["url"], item["title"], item["retailer"],
                     item["price"], item["list_price"], item["discount_pct"],
                     item["savings"], item["image"], item["age_text"], now, now,
+                    _posted_at(item.get("age_text"), now),
                     source, item.get("asin", ""), item.get("direct_url", ""),
                     # Feed sources already carry everything; skip the detail fetch.
                     item.get("detail_state", 0),
@@ -124,11 +156,16 @@ def upsert_listing(items, source="hiddenclearances"):
             db.execute(
                 "UPDATE deals SET url=?, title=?, retailer=?, price=?, list_price=?,"
                 " discount_pct=?, savings=?, image=?, age_text=?, last_seen=?, gone=0,"
+                " posted_at=COALESCE(posted_at, ?),"
                 " prev_price=COALESCE(?, prev_price) WHERE id=?",
                 (
                     item["url"], item["title"], item["retailer"], item["price"],
                     item["list_price"], item["discount_pct"], item["savings"],
-                    item["image"], item["age_text"], now, prev, item["id"],
+                    item["image"], item["age_text"], now,
+                    # Set once and keep: age_text drifts every poll, so
+                    # recomputing would make the posting time wander.
+                    _posted_at(item.get("age_text"), now),
+                    prev, item["id"],
                 ),
             )
     if seen_ids:
@@ -232,11 +269,13 @@ def list_deals(amazon_only=False, min_discount=0, sort="score", limit=300):
         where.append("discount_pct >= ?")
         args.append(min_discount)
     order = {
-        "score": "score DESC, first_seen DESC",
-        "newest": "first_seen DESC",
+        "score": "score DESC, posted_at DESC",
+        "newest": "posted_at DESC, first_seen DESC",
+        "oldest": "posted_at ASC, first_seen ASC",
         "discount": "discount_pct DESC, savings DESC",
+        "discount_asc": "discount_pct ASC, savings ASC",
         "savings": "savings DESC",
-    }.get(sort, "score DESC, first_seen DESC")
+    }.get(sort, "score DESC, posted_at DESC")
     args.append(limit)
     rows = conn().execute(
         f"SELECT * FROM deals WHERE {' AND '.join(where)} ORDER BY {order} LIMIT ?",
