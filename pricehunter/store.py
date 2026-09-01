@@ -166,7 +166,7 @@ def upsert_listing(items, source="hiddenclearances"):
             db.execute(
                 "UPDATE deals SET url=?, title=?, retailer=?, price=?, list_price=?,"
                 " discount_pct=?, savings=?, image=?, age_text=?, last_seen=?, gone=0,"
-                " posted_at=COALESCE(posted_at, ?),"
+                " posted_at=COALESCE(posted_at, ?), category=?,"
                 " prev_price=COALESCE(?, prev_price) WHERE id=?",
                 (
                     item["url"], item["title"], item["retailer"], item["price"],
@@ -175,6 +175,9 @@ def upsert_listing(items, source="hiddenclearances"):
                     # Set once and keep: age_text drifts every poll, so
                     # recomputing would make the posting time wander.
                     _posted_at(item.get("age_text"), now),
+                    # Recomputed every refresh so rows classified under older
+                    # rules pick up improvements instead of staying stale.
+                    filters.classify(item),
                     prev, item["id"],
                 ),
             )

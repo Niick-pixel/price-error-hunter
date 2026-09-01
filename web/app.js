@@ -56,7 +56,6 @@ function stat(label, value, mod) {
 function buildCard(deal) {
   const card = el("article", "card");
   card.dataset.id = deal.id;
-  if (deal.id === openId) card.classList.add("open");
 
   // thumbnail
   const thumb = el("div", "thumb");
@@ -107,16 +106,75 @@ function buildCard(deal) {
   meta.append(el("span", null, deal.savings ? `save ${money(deal.savings)}` : ""));
   body.append(meta);
 
-  if (deal.id === openId) body.append(buildDetail(deal));
   card.append(body);
 
   card.addEventListener("click", (event) => {
     if (event.target.closest("a")) return;
-    openId = openId === deal.id ? null : deal.id;
-    render(window.__deals || []);
+    openModal(deal.id);
   });
   return card;
 }
+
+/* Details open in a floating panel. Previously they expanded inline, which
+   pushed the whole grid around and forced a full re-render on every click. */
+function openModal(id) {
+  const deal = (window.__deals || []).find((d) => d.id === id);
+  if (!deal) return;
+  openId = id;
+
+  const bodyEl = $("modalbody");
+  bodyEl.replaceChildren();
+
+  const img = safeUrl(deal.image);
+  if (img) {
+    const hero = el("div", "modalhero");
+    const image = new Image();
+    image.src = img;
+    image.alt = deal.title || "";
+    image.onerror = () => hero.remove();
+    image.onload = () => {
+      if (image.naturalWidth < 32) hero.remove();
+    };
+    hero.append(image);
+    bodyEl.append(hero);
+  }
+
+  const main = el("div", "modalmain");
+  const line = el("div", "retailerline");
+  line.append(el("span", "retailer", deal.retailer || "Unknown"));
+  line.append(el("span", "srctag", SOURCE_LABEL[deal.source] || deal.source || "feed"));
+  main.append(line);
+  const heading = el("h2", "title", deal.title || "Untitled");
+  heading.id = "modaltitle";
+  main.append(heading);
+  main.append(buildDetail(deal));
+  bodyEl.append(main);
+
+  $("modal").classList.remove("hidden");
+  document.body.classList.add("modal-open");
+  $("modalclose").focus();
+}
+
+function closeModal() {
+  const modal = $("modal");
+  if (modal.classList.contains("hidden")) return;
+  openId = null;
+  document.body.classList.remove("modal-open");
+  modal.classList.add("closing");
+  setTimeout(() => {
+    modal.classList.add("hidden");
+    modal.classList.remove("closing");
+    $("modalbody").replaceChildren();
+  }, 220);
+}
+
+$("modalclose").addEventListener("click", closeModal);
+$("modal").addEventListener("click", (event) => {
+  if (event.target === $("modal")) closeModal();
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closeModal();
+});
 
 function buildDetail(deal) {
   const wrap = el("div", "detail");
@@ -182,7 +240,8 @@ function buildDetail(deal) {
       method: "POST",
       body: JSON.stringify({ id: deal.id }),
     }).catch(() => {});
-    openId = null;
+    cardCache.delete(deal.id);
+    closeModal();
     load();
   });
   actions.append(hide);
@@ -219,8 +278,11 @@ function buildAmazonPanel(deal) {
   }
   panel.append(head);
 
-  // Price history comes from CamelCamelCamel and is loaded by the browser
-  // directly, so no scraping happens and nothing can be blocked server-side.
+  // Price history is loaded straight from CamelCamelCamel by the browser, so
+  // nothing is scraped. They do apply hotlink protection, and when it kicks in
+  // the chart and its caption are both removed together - an orphaned caption
+  // describing a missing chart is worse than no chart at all.
+  const chartBlock = el("div", "chartblock");
   const chart = el("div", "chartwrap");
   const img = new Image();
   img.src =
@@ -228,10 +290,19 @@ function buildAmazonPanel(deal) {
     `/amazon-new-used.png?force=1&zero=0&w=725&h=440&desired=false&legend=1&ilt=1&tp=all&fo=0`;
   img.alt = `Amazon price history for ${deal.asin}`;
   img.loading = "lazy";
-  img.onerror = () => chart.remove();
+  img.onerror = () => {
+    chartBlock.replaceChildren(
+      el("p", "chartcap",
+         "CamelCamelCamel is not serving the inline chart right now — " +
+         "use Price history page below for the full graph.")
+    );
+  };
   chart.append(img);
-  panel.append(chart);
-  panel.append(el("p", "chartcap", "Amazon price history (CamelCamelCamel) — green is Amazon's own price."));
+  chartBlock.append(chart);
+  chartBlock.append(
+    el("p", "chartcap", "Amazon price history (CamelCamelCamel) — green is Amazon's own price.")
+  );
+  panel.append(chartBlock);
 
   const row = el("div", "actions");
   const check = el("button", "btn", "Check live price");
@@ -299,24 +370,62 @@ const revealer =
       )
     : null;
 
+/* Everything the card paints except the age, which ticks on every poll and is
+   patched in place instead of forcing a rebuild. */
+function cardSignature(d) {
+  return [
+    d.title, d.price, d.list_price, d.discount_pct, d.savings,
+    d.score, d.tier, d.is_new, d.image, d.retailer, d.source,
+  ].join("");
+}
+
+const cardCache = new Map();
+
+/* The age string changes every poll. Patching it avoids rebuilding the card
+   (and its image) just to move "2 min ago" to "5 min ago". */
+function patchAge(card, deal) {
+  const meta = card.querySelector(".meta span");
+  if (meta && meta.textContent !== (deal.age_text || "")) {
+    meta.textContent = deal.age_text || "";
+  }
+  const flag = card.querySelector(".newflag");
+  if (!deal.is_new && flag) flag.remove();
+}
+
 function render(deals) {
   window.__deals = deals;
   const grid = $("grid");
-  grid.replaceChildren();
-  // Skip the animation entirely for a hidden tab: the observer never fires
-  // there, and content must not depend on it.
   const animate = revealer && !document.hidden;
+  const frag = document.createDocumentFragment();
+  const seen = new Set();
+
   deals.forEach((d, index) => {
-    const card = buildCard(d);
-    // Only animate a card the first time it is seen. The grid is rebuilt on
-    // every poll, so re-animating made the whole page bounce every refresh.
-    if (animate && d.id !== openId && !revealed.has(d.id)) {
-      card.classList.add("reveal");
-      card.style.transitionDelay = index < 12 ? `${Math.min(index, 11) * 45}ms` : "0ms";
-      revealer.observe(card);
+    seen.add(d.id);
+    const sig = cardSignature(d);
+    let entry = cardCache.get(d.id);
+
+    if (!entry || entry.sig !== sig) {
+      // Rebuilding replaces the <img>, so only do it when something visible
+      // actually changed. Recreating every card each poll was what made the
+      // thumbnails flash black.
+      const card = buildCard(d);
+      entry = { card, sig };
+      cardCache.set(d.id, entry);
+      if (animate && !revealed.has(d.id)) {
+        card.classList.add("reveal");
+        card.style.transitionDelay = index < 12 ? `${Math.min(index, 11) * 45}ms` : "0ms";
+        revealer.observe(card);
+      }
+    } else {
+      patchAge(entry.card, d);
     }
-    grid.append(card);
+    frag.append(entry.card);   // moves the existing node, keeping its image
   });
+
+  cardCache.forEach((_, id) => {
+    if (!seen.has(id)) cardCache.delete(id);
+  });
+  grid.replaceChildren(frag);
   scheduleRevealFallback();
 
   $("empty").classList.toggle("hidden", deals.length > 0);

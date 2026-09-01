@@ -25,7 +25,7 @@ CATEGORIES = {
             r"\(the .+ series\)", r"\b(?:trilogy|saga)\b",
             r":\s*a (?:memoir|thriller|mystery|romance|story|history|biography)\b",
             r"\bcomplete series\b", r"\blarge print\b", r"\bbestselling\b",
-            r"\bauthor collection\b",
+            r"\bauthor collection\b", r"\blectures?\b", r"\bessays?\b",
             r":\s*the (?:untold |true |secret )?(?:story|history|life|rise|fall)\b",
         ),
     },
@@ -48,8 +48,13 @@ CATEGORIES = {
     "beauty": {
         "label": "Beauty & personal care",
         "patterns": (
+            # "foundation" and "toner" are deliberately qualified: bare, they
+            # match things like "Foundation Lectures" and "printer toner".
             r"\b(?:shampoo|conditioner|lotion|serum|moisturizer|mascara|lipstick|"
-            r"foundation|concealer|nail polish|perfume|cologne|hair dye|toner)\b",
+            r"concealer|nail polish|perfume|cologne|hair dye)\b",
+            r"\b(?:liquid|powder|matte|makeup)\s+foundation\b",
+            r"\bfoundation\s+(?:makeup|stick|powder|spf)\b",
+            r"\b(?:facial|skin|hydrating)\s+toner\b",
         ),
     },
     "clothing": {

@@ -1,11 +1,15 @@
 :root {
-  --bg: #000000;
-  --panel: rgba(255, 255, 255, .045);
-  --panel-2: rgba(255, 255, 255, .07);
-  --border: rgba(255, 255, 255, .1);
-  --border-strong: rgba(255, 255, 255, .18);
-  --text: #f5f5f7;
-  --muted: #86868b;
+  /* Charcoal rather than pitch black: less eye strain and it gives the
+     translucent panels something to sit on. */
+  --bg: #16181d;
+  --bg-raised: #1e2128;
+  --panel: rgba(255, 255, 255, .05);
+  --panel-2: rgba(255, 255, 255, .085);
+  --border: rgba(255, 255, 255, .11);
+  --border-strong: rgba(255, 255, 255, .2);
+  --text: #f2f4f7;
+  /* Lifted from #86868b, which failed contrast on this lighter background. */
+  --muted: #a2a9b4;
   --brand: #ff7a18;
   --error: #ff453a;
   --strong: #ffd60a;
@@ -25,14 +29,18 @@
 html {
   background: var(--bg);
   scroll-behavior: smooth;
+  /* Tells the browser to render native widgets - select popups, scrollbars,
+     form controls - with their dark variants. Without this the option list
+     renders on white and is unreadable. */
+  color-scheme: dark;
 }
 
 body {
   margin: 0;
   background-color: var(--bg);
   background-image:
-    radial-gradient(900px 520px at 12% -8%, rgba(255, 122, 24, .13) 0%, transparent 60%),
-    radial-gradient(760px 480px at 88% 0%, rgba(10, 132, 255, .10) 0%, transparent 62%);
+    radial-gradient(900px 520px at 12% -8%, rgba(255, 122, 24, .10) 0%, transparent 60%),
+    radial-gradient(760px 480px at 88% 0%, rgba(10, 132, 255, .09) 0%, transparent 62%);
   background-attachment: fixed;
   color: var(--text);
   font: 15px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI",
@@ -218,12 +226,24 @@ a.linkbtn { text-decoration: none; display: inline-flex; align-items: center; }
 .field { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--muted); }
 
 .field select {
-  background: var(--panel-2);
+  background: var(--bg-raised);
   color: var(--text);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 6px 9px;
+  border-radius: 9px;
+  padding: 7px 11px;
   font-size: 12.5px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color .25s var(--ease), background .25s var(--ease);
+}
+.field select:hover { border-color: var(--border-strong); }
+.field select:focus-visible { outline: 2px solid rgba(255, 122, 24, .6); outline-offset: 1px; }
+
+/* The popup list is drawn by the OS; give it explicit dark colours so the
+   options are not grey-on-white. */
+.field select option {
+  background: var(--bg-raised);
+  color: var(--text);
 }
 
 .toggle { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--muted); cursor: pointer; }
@@ -318,6 +338,83 @@ a.linkbtn { text-decoration: none; display: inline-flex; align-items: center; }
   transition: background .2s var(--ease), color .2s var(--ease);
 }
 .hidecard:hover { background: rgba(255, 69, 58, .16); color: var(--error); }
+
+/* ---------- detail modal ---------- */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background: rgba(0, 0, 0, .62);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  animation: fadeIn .28s var(--ease) both;
+}
+.modal.closing { animation: fadeOut .22s var(--ease) both; }
+
+@keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+
+.modalcard {
+  position: relative;
+  width: min(880px, 100%);
+  max-height: min(88vh, 940px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 40px 100px rgba(0, 0, 0, .7);
+  animation: modalIn .48s var(--spring) both;
+}
+.modal.closing .modalcard { animation: modalOut .22s var(--ease) both; }
+
+@keyframes modalIn {
+  from { opacity: 0; transform: translateY(22px) scale(.94); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes modalOut {
+  from { opacity: 1; transform: none; }
+  to   { opacity: 0; transform: translateY(10px) scale(.97); }
+}
+
+.modalclose {
+  position: absolute;
+  top: 14px; right: 14px;
+  z-index: 2;
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(20, 20, 22, .6);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background .2s var(--ease), transform .3s var(--spring);
+}
+.modalclose:hover { background: rgba(60, 60, 64, .9); transform: scale(1.08); }
+
+.modalhero {
+  position: relative;
+  height: 300px;
+  background: #fff;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  overflow: hidden;
+}
+.modalhero img {
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+  object-fit: contain;
+  padding: 22px;
+}
+.modalmain { padding: 24px 28px 28px; }
+.modalmain .title { font-size: 21px; line-height: 1.3; margin: 6px 0 16px; }
+
+body.modal-open { overflow: hidden; }
 
 /* ---------- alert ---------- */
 .alert {
@@ -423,14 +520,6 @@ a.linkbtn { text-decoration: none; display: inline-flex; align-items: center; }
 }
 .card:active { transform: translateY(-2px) scale(.995); }
 
-.card.open {
-  grid-column: 1 / -1;
-  cursor: default;
-  border-color: rgba(255, 122, 24, .5);
-  box-shadow: 0 26px 70px rgba(0, 0, 0, .6);
-  transform: none;
-}
-
 .card .thumb {
   position: relative;
   /* Dark until a real image arrives, so a missing thumbnail is never a
@@ -468,12 +557,9 @@ a.linkbtn { text-decoration: none; display: inline-flex; align-items: center; }
   text-transform: uppercase;
   color: rgba(255, 255, 255, .3);
 }
-.card.open .thumb { height: 330px; }
-
 /* A slow zoom on hover, the way Apple treats product photography. */
 .card .thumb img { transition: transform .8s var(--ease-out); }
 .card:hover .thumb img { transform: scale(1.05); }
-.card.open:hover .thumb img { transform: none; }
 
 /* Absolute positioning against the fixed-height box, because a percentage
    max-height on a grid/flex child does not resolve and the image escapes. */
@@ -530,7 +616,7 @@ a.linkbtn { text-decoration: none; display: inline-flex; align-items: center; }
 }
 
 .srctag {
-  font-size: 9.5px;
+  font-size: 10.5px;
   color: var(--muted);
   border: 1px solid var(--border);
   border-radius: 5px;
