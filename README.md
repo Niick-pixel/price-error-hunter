@@ -10,6 +10,22 @@ installs two packages; after that it starts in a second or two and opens your br
 
 Close the console window to stop it.
 
+## Alerts
+
+When a newly found deal scores at or above the alert threshold, a notification
+card slides in at the bottom right showing the product image, price and
+discount. **Clicking it opens the deal**; the × dismisses it.
+
+The sound is a soft two-note chime generated in the browser with WebAudio.
+Earlier versions called `winsound.MessageBeep`, which played the Windows
+*exclamation* sound — an error noise for something that is good news. Browsers
+only allow audio after a user gesture, so the audio context is primed on your
+first click.
+
+If you grant notification permission, alerts also appear as desktop
+notifications that open the deal when clicked, so they still reach you while the
+tab is in the background.
+
 ## Where deals come from
 
 Three public feeds are polled, each costing one request per cycle. A failing feed
@@ -20,6 +36,10 @@ never stops the others, and each source only ever expires its own deals.
 | **Hidden Clearances** | Curated clearance and price errors across major US retailers |
 | **CamelCamelCamel top drops** | The biggest recent **Amazon** price drops, with ASIN and exact before/after prices |
 | **Slickdeals front page** | Community-vetted deals across many retailers, roughly half Amazon |
+| **Slickdeals popular** | Runs deeper than the front page and only partly overlaps it |
+| **TechBargains** | Amazon-heavy; its links are already product URLs, so ASINs come free |
+
+Together they bring in around 150 live deals per cycle.
 
 CamelCamelCamel is the important one for finding Amazon discounts independently:
 its feed titles read `… - down 28.13% ($18.00) to $45.99 from $63.99` and the link
@@ -41,6 +61,37 @@ fingerprints and solving CAPTCHAs — that is circumventing anti-bot protection,
 against Amazon's Conditions of Use, and a good way to get an IP or account
 flagged. Reading feeds that already track Amazon prices gets the same answer,
 legitimately and far more reliably.
+
+## Hiding product types you do not care about
+
+**Hide products…** in the toolbar opens two controls:
+
+- **Category pills** — Books & Kindle, Food & drink, Vitamins & supplements,
+  Beauty, Clothing. **Books are hidden by default**, because Kindle price drops
+  otherwise dominate CamelCamelCamel: in a typical batch 13–14 of its 20 items
+  are ebooks.
+- **Hide titles containing** — a comma-separated free-text list.
+
+Every deal is classified once at ingest and the category is stored, so toggling a
+pill re-filters instantly without re-fetching anything.
+
+### How reliable is it?
+
+Worth being straight about, because it is title-based guesswork. There is no
+category field in any feed, and Amazon's category API needs the Associates
+access described below. **Kindle editions get ordinary `B0` ASINs**, so an ISBN
+check alone catches almost nothing.
+
+The classifier combines explicit wording (`a novel`, `Book 3`, `Kindle`,
+`bestselling`, …), ISBN-shaped ASINs, and a cheap-media rule: under about $6,
+with no size, count or model number anywhere in the title. Product titles nearly
+always carry one — `32-Oz`, `2-Pack`, `Fusion19`, `PR011` — and books nearly
+never do.
+
+Measured against live feeds, that hides **13 of 15 books with no real products
+caught**. It is not perfect: a title like *Habsburgs on the Rio Grande* at $14.72
+sits above the price band and stays. For those, use the keyword box or the
+**Hide this deal** button on any card, which removes it permanently.
 
 ## Two sections
 

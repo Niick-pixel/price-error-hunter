@@ -5,6 +5,7 @@ let openId = null;
 let settings = {};
 let firstLoad = true;
 let view = "feed";
+let lastAlertId = null;
 
 const api = async (path, options = {}) => {
   const res = await fetch(path, {
@@ -163,6 +164,21 @@ function buildDetail(deal) {
     alt.rel = "noopener noreferrer";
     actions.append(alt);
   }
+
+  // Escape hatch for anything the category rules miss.
+  const hide = el("button", "hidecard", "Hide this deal");
+  hide.addEventListener("click", async (event) => {
+    event.stopPropagation();
+    hide.disabled = true;
+    await api("/api/hide", {
+      method: "POST",
+      body: JSON.stringify({ id: deal.id }),
+    }).catch(() => {});
+    openId = null;
+    load();
+  });
+  actions.append(hide);
+
   wrap.append(actions);
   return wrap;
 }
@@ -232,11 +248,35 @@ function buildAmazonPanel(deal) {
   return panel;
 }
 
+/* Cards fade up as they scroll into view. Anything already on screen at render
+   time is revealed straight away, so the first paint never looks empty. */
+const revealer =
+  "IntersectionObserver" in window
+    ? new IntersectionObserver(
+        (entries, obs) =>
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return;
+            entry.target.classList.add("in-view");
+            obs.unobserve(entry.target);
+          }),
+        { rootMargin: "0px 0px -8% 0px", threshold: 0.05 }
+      )
+    : null;
+
 function render(deals) {
   window.__deals = deals;
   const grid = $("grid");
   grid.replaceChildren();
-  deals.forEach((d) => grid.append(buildCard(d)));
+  deals.forEach((d, index) => {
+    const card = buildCard(d);
+    if (revealer && d.id !== openId) {
+      card.classList.add("reveal");
+      // Stagger only the first screenful; later rows animate on scroll.
+      card.style.transitionDelay = index < 12 ? `${Math.min(index, 11) * 45}ms` : "0ms";
+      revealer.observe(card);
+    }
+    grid.append(card);
+  });
 
   $("empty").classList.toggle("hidden", deals.length > 0);
   if (!deals.length) $("empty").textContent = "No deals match these filters yet.";
@@ -288,16 +328,128 @@ function applyStatus(status) {
       "history, so it is out of reach for most personal setups."));
   }
 
+  renderAlert(status.top_new);
+}
+
+/* The alert used to be an unlabelled bar that only marked things read, which is
+   why clicking it appeared to do nothing. It now opens the deal, and dismissing
+   is a separate control so the two actions cannot be confused. */
+function renderAlert(top) {
   const alert = $("alert");
-  if (status.top_new) {
-    alert.classList.remove("hidden");
-    alert.replaceChildren(
-      el("strong", null, `Possible price error (${Math.round(status.top_new.score)}/100): `),
-      el("span", null, status.top_new.title)
-    );
-  } else {
+  if (!top) {
     alert.classList.add("hidden");
+    lastAlertId = null;
+    return;
   }
+
+  if (top.id !== lastAlertId) {
+    lastAlertId = top.id;
+    if (settings.sound_alerts) chime();
+    notifyDesktop(top);
+  }
+
+  alert.classList.remove("hidden");
+  alert.replaceChildren();
+
+  if (top.image) {
+    const img = new Image();
+    img.className = "alertthumb";
+    img.src = top.image;
+    img.alt = "";
+    img.onerror = () => img.remove();
+    alert.append(img);
+  }
+
+  const body = el("div", "alertbody");
+  body.append(el("span", "alertkicker", `Possible price error · ${Math.round(top.score)}/100`));
+  body.append(el("span", "alerttitle", top.title));
+  const bits = [];
+  if (top.retailer) bits.push(top.retailer);
+  if (typeof top.price === "number") bits.push(money(top.price));
+  if (top.discount_pct) bits.push(`${Math.round(top.discount_pct)}% off`);
+  bits.push("Click to open →");
+  body.append(el("div", "alertmeta", bits.join(" · ")));
+  alert.append(body);
+
+  const close = el("button", "alertclose", "×");
+  close.title = "Dismiss";
+  close.addEventListener("click", (event) => {
+    event.stopPropagation();
+    dismissAlert();
+  });
+  alert.append(close);
+
+  alert.onclick = () => {
+    const url = safeUrl(top.url);
+    if (url) window.open(url, "_blank", "noopener,noreferrer");
+    dismissAlert();
+  };
+}
+
+async function dismissAlert() {
+  $("alert").classList.add("hidden");
+  const ids = (window.__deals || []).filter((d) => d.is_new).map((d) => d.id);
+  await api("/api/seen", { method: "POST", body: JSON.stringify({ ids }) }).catch(() => {});
+  load();
+}
+
+/* A soft two-note chime built with WebAudio, replacing the Windows
+   exclamation sound the app used to trigger through winsound. */
+let audioCtx = null;
+function chime() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    audioCtx = audioCtx || new Ctx();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    const now = audioCtx.currentTime;
+    [
+      { f: 880.0, t: 0 },      // A5
+      { f: 1318.51, t: 0.13 }, // E6
+    ].forEach(({ f, t }) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = f;
+      // Quick attack, long soft tail so it reads as a chime, not a buzz.
+      gain.gain.setValueAtTime(0.0001, now + t);
+      gain.gain.exponentialRampToValueAtTime(0.16, now + t + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + t + 0.55);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(now + t);
+      osc.stop(now + t + 0.6);
+    });
+  } catch {}
+}
+
+// Browsers only allow audio after a gesture, so prime the context on first click.
+["click", "keydown"].forEach((evt) =>
+  window.addEventListener(evt, function prime() {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      audioCtx = audioCtx || (Ctx ? new Ctx() : null);
+      if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+    } catch {}
+    window.removeEventListener(evt, prime);
+  }, { once: true })
+);
+
+function notifyDesktop(top) {
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  try {
+    const note = new Notification("Possible price error", {
+      body: `${top.title}\n${top.retailer || ""} ${
+        typeof top.price === "number" ? money(top.price) : ""
+      }`.trim(),
+      icon: top.image || undefined,
+      tag: top.id,
+    });
+    note.onclick = () => {
+      const url = safeUrl(top.url);
+      if (url) window.open(url, "_blank", "noopener,noreferrer");
+      note.close();
+    };
+  } catch {}
 }
 
 const fmt = (s) => (s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`);
@@ -310,8 +462,35 @@ function applySettings(cfg) {
     $("sound").checked = !!cfg.sound_alerts;
     $("livecheck").checked = !!cfg.amazon_live_check;
     $("interval").value = String(cfg.poll_interval);
+    $("keywords").value = cfg.exclude_keywords || "";
     firstLoad = false;
   }
+}
+
+function renderCategories(list, excluded) {
+  const box = $("categories");
+  if (!list || box.dataset.built === "1") return;
+  box.dataset.built = "1";
+  box.replaceChildren();
+  list.forEach((cat) => {
+    const on = (excluded || []).includes(cat.key);
+    const pill = el("label", "catpill" + (on ? " on" : ""));
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.checked = on;
+    input.value = cat.key;
+    input.addEventListener("change", () => {
+      pill.classList.toggle("on", input.checked);
+      saveSettings();
+      load();
+    });
+    pill.append(input, el("span", "tick", "✓"), el("span", null, cat.label));
+    box.append(pill);
+  });
+}
+
+function selectedCategories() {
+  return [...document.querySelectorAll("#categories input:checked")].map((i) => i.value);
 }
 
 async function load() {
@@ -322,6 +501,7 @@ async function load() {
   });
   try {
     const data = await api(`/api/deals?${params}`);
+    renderCategories(data.categories, data.settings.excluded_categories);
     applySettings(data.settings);
     applyStatus(data.status);
     render(data.deals);
@@ -373,9 +553,28 @@ function saveSettings() {
     sound_alerts: $("sound").checked,
     amazon_live_check: $("livecheck").checked,
     poll_interval: Number($("interval").value),
+    excluded_categories: selectedCategories(),
+    exclude_keywords: $("keywords").value,
   };
   api("/api/settings", { method: "POST", body: JSON.stringify(payload) }).catch(() => {});
 }
+
+$("hidebtn").addEventListener("click", () => {
+  const panel = $("hidepanel");
+  const open = panel.classList.toggle("hidden");
+  $("hidebtn").setAttribute("aria-expanded", String(!open));
+  $("hidebtn").textContent = open ? "Hide products…" : "Done";
+});
+
+let kwTimer = null;
+$("keywords").addEventListener("input", () => {
+  clearTimeout(kwTimer);
+  // Debounced so a filter is not run on every keystroke.
+  kwTimer = setTimeout(() => {
+    saveSettings();
+    load();
+  }, 450);
+});
 
 ["mindiscount", "sort"].forEach((id) =>
   $(id).addEventListener("change", () => {
@@ -399,12 +598,13 @@ $("refresh").addEventListener("click", async () => {
   }
 });
 
-$("alert").addEventListener("click", async () => {
-  const ids = (window.__deals || []).filter((d) => d.is_new).map((d) => d.id);
-  await api("/api/seen", { method: "POST", body: JSON.stringify({ ids }) }).catch(() => {});
-  $("alert").classList.add("hidden");
-  load();
-});
+// Ask once for desktop notifications so alerts still land when the tab is hidden.
+if ("Notification" in window && Notification.permission === "default") {
+  window.addEventListener("click", function ask() {
+    Notification.requestPermission().catch(() => {});
+    window.removeEventListener("click", ask);
+  }, { once: true });
+}
 
 load();
 setInterval(load, 20000);

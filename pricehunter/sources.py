@@ -6,9 +6,11 @@ biggest drops, ASIN included, which is exactly the signal a price-error hunt
 needs.
 """
 
+import html
 import re
 import time
 from email.utils import parsedate_to_datetime
+from urllib.parse import urlparse
 from xml.etree import ElementTree
 
 from bs4 import BeautifulSoup
@@ -20,6 +22,15 @@ SLICKDEALS_FEED = (
     "https://slickdeals.net/newsearch.php"
     "?mode=frontpage&searcharea=deals&searchin=first&rss=1"
 )
+SLICKDEALS_POPULAR = (
+    "https://slickdeals.net/newsearch.php"
+    "?mode=popdeals&searcharea=deals&searchin=first&rss=1"
+)
+TECHBARGAINS_FEED = "https://www.techbargains.com/rss.xml"
+
+# TechBargains puts the price at the end of the title: "... Jumper Cables $33.33"
+TRAILING_PRICE = re.compile(r"\$\s?([\d,]+(?:\.\d{2})?)\s*$")
+LEADING_PRICE_TAG = re.compile(r"^\$\s?[\d,]+(?:\.\d{2})?\*?\s*\|\s*")
 
 # "Product Name - down 12.45% ($4.12) to $28.98 from $33.10"
 CAMEL_TITLE = re.compile(
@@ -108,7 +119,8 @@ def _items(xml):
                 BeautifulSoup(description, "html.parser").get_text(" ").split()
             )
         yield {
-            "title": text("title"),
+            # Some feeds double-escape entities, leaving &#039; in the text.
+            "title": html.unescape(text("title")),
             "link": text("link"),
             "description": description,
             "image": image,
@@ -160,9 +172,10 @@ class Slickdeals:
 
     name = "slickdeals"
     label = "Slickdeals"
+    feed = SLICKDEALS_FEED
 
     def fetch(self, session, timeout):
-        resp = session.get(SLICKDEALS_FEED, timeout=timeout)
+        resp = session.get(self.feed, timeout=timeout)
         resp.raise_for_status()
         out = []
         for entry in _items(resp.text):
@@ -213,7 +226,8 @@ class Slickdeals:
             out.append({
                 "id": scraper.deal_id(entry["link"]),
                 "url": entry["link"],
-                "title": title,
+                # The popular feed prefixes titles with "$79* | "; drop it.
+                "title": LEADING_PRICE_TAG.sub("", title).strip(),
                 "retailer": retailer,
                 "price": price,
                 "list_price": list_price,
@@ -228,4 +242,65 @@ class Slickdeals:
         return out
 
 
-ALL = (CamelTopDrops(), Slickdeals())
+class SlickdealsPopular(Slickdeals):
+    """The popular list runs deeper than the front page and overlaps only partly."""
+
+    name = "slickdeals_popular"
+    label = "Slickdeals popular"
+    feed = SLICKDEALS_POPULAR
+
+
+class TechBargains:
+    """Amazon-heavy feed whose links are already product URLs, so ASINs are free."""
+
+    name = "techbargains"
+    label = "TechBargains"
+    MAX_ITEMS = 60
+
+    def fetch(self, session, timeout):
+        resp = session.get(TECHBARGAINS_FEED, timeout=timeout)
+        resp.raise_for_status()
+        out = []
+        for entry in _items(resp.text):
+            title, link = entry["title"], entry["link"]
+            if not title or not link:
+                continue
+            price_match = TRAILING_PRICE.search(title)
+            if not price_match:
+                continue
+            price = _num(price_match.group(1))
+            if price is None:
+                continue
+
+            asin = ""
+            found = AMAZON_DP.search(link)
+            if found:
+                asin = found.group(1).upper()
+
+            clean = TRAILING_PRICE.sub("", title).strip(" -–—")
+            out.append({
+                "id": scraper.deal_id(link),
+                "url": link,
+                "title": clean or title,
+                "retailer": "Amazon" if asin else _host_label(link),
+                "price": price,
+                "list_price": None,
+                "discount_pct": 0.0,
+                "savings": 0.0,
+                "image": amazon_image(asin) if asin else "",
+                "age_text": _age_text(entry["pub_date"]),
+                "asin": asin,
+                "direct_url": f"https://www.amazon.com/dp/{asin}" if asin else link,
+                "detail_state": 1,
+            })
+            if len(out) >= self.MAX_ITEMS:
+                break
+        return out
+
+
+def _host_label(url):
+    host = urlparse(url).netloc.lower().replace("www.", "")
+    return host.split(".")[0].replace("-", " ").title() if host else "Unknown"
+
+
+ALL = (CamelTopDrops(), Slickdeals(), SlickdealsPopular(), TechBargains())

@@ -6,7 +6,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from . import amazon, config, creators, store
+from . import amazon, config, creators, filters, store
 
 TOKEN = secrets.token_urlsafe(24)
 
@@ -108,6 +108,10 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/api/settings":
             self._json(config.update(body))
             return
+        if parsed.path == "/api/hide":
+            store.hide_deal(body.get("id"))
+            self._json({"ok": True})
+            return
         if parsed.path == "/api/amazon/check":
             self._json(self._amazon_check(body.get("id")))
             return
@@ -127,10 +131,18 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError:
             min_discount = 0
         sort = query.get("sort", [cfg["sort"]])[0]
+        keywords = [w for w in (cfg.get("exclude_keywords") or "").split(",") if w.strip()]
         deals = store.list_deals(
-            amazon_only=amazon_only, min_discount=min_discount, sort=sort
+            amazon_only=amazon_only, min_discount=min_discount, sort=sort,
+            exclude_categories=cfg.get("excluded_categories") or (),
+            exclude_keywords=keywords,
         )
-        self._json({"deals": deals, "status": self._status(), "settings": cfg})
+        self._json({
+            "deals": deals,
+            "status": self._status(),
+            "settings": cfg,
+            "categories": filters.category_labels(),
+        })
 
     def _amazon_check(self, deal_id):
         deal = store.get(deal_id) if deal_id else None

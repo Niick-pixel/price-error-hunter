@@ -3,7 +3,7 @@ import sqlite3
 import threading
 import time
 
-from . import config, scoring
+from . import config, filters, scoring
 
 _local = threading.local()
 
@@ -40,6 +40,8 @@ CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
 MIGRATIONS = (
     ("source", "TEXT DEFAULT 'hiddenclearances'"),
     ("posted_at", "REAL"),
+    ("category", "TEXT"),
+    ("hidden", "INTEGER DEFAULT 0"),
     ("direct_url", "TEXT"),
     ("asin", "TEXT"),
     ("amz_price", "REAL"),
@@ -75,6 +77,13 @@ def _migrate(db):
         else:
             continue  # already correct; leave it alone
         db.execute("UPDATE deals SET posted_at=? WHERE id=?", (posted, row["id"]))
+
+    # Classify rows stored before categories existed.
+    for row in db.execute(
+        "SELECT id, title, asin, price, list_price FROM deals WHERE category IS NULL"
+    ).fetchall():
+        db.execute("UPDATE deals SET category=? WHERE id=?",
+                   (filters.classify(dict(row)), row["id"]))
     db.commit()
 
 
@@ -137,13 +146,14 @@ def upsert_listing(items, source="hiddenclearances"):
             db.execute(
                 "INSERT INTO deals (id, url, title, retailer, price, list_price,"
                 " discount_pct, savings, image, age_text, first_seen, last_seen,"
-                " posted_at, source, asin, direct_url, detail_state)"
-                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                " posted_at, category, source, asin, direct_url, detail_state)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     item["id"], item["url"], item["title"], item["retailer"],
                     item["price"], item["list_price"], item["discount_pct"],
                     item["savings"], item["image"], item["age_text"], now, now,
                     _posted_at(item.get("age_text"), now),
+                    filters.classify(item),
                     source, item.get("asin", ""), item.get("direct_url", ""),
                     # Feed sources already carry everything; skip the detail fetch.
                     item.get("detail_state", 0),
@@ -258,9 +268,14 @@ def get(deal_id):
     return _to_dict(row) if row else None
 
 
-def list_deals(amazon_only=False, min_discount=0, sort="score", limit=300):
-    where = ["gone=0"]
+def list_deals(amazon_only=False, min_discount=0, sort="score", limit=300,
+               exclude_categories=(), exclude_keywords=()):
+    where = ["gone=0", "hidden=0"]
     args = []
+    if exclude_categories:
+        marks = ",".join("?" * len(exclude_categories))
+        where.append(f"(category IS NULL OR category NOT IN ({marks}))")
+        args.extend(exclude_categories)
     if amazon_only:
         # Some deals are filed under a generic retailer but still resolve to an
         # Amazon product, so treat a known ASIN as proof it belongs here.
@@ -281,7 +296,22 @@ def list_deals(amazon_only=False, min_discount=0, sort="score", limit=300):
         f"SELECT * FROM deals WHERE {' AND '.join(where)} ORDER BY {order} LIMIT ?",
         args,
     ).fetchall()
-    return [_to_dict(r) for r in rows]
+    deals = [_to_dict(r) for r in rows]
+    if exclude_keywords:
+        # Free-text exclusions are matched in Python so users can type a plain
+        # comma-separated list without it becoming a pile of SQL LIKEs.
+        words = [w.strip().lower() for w in exclude_keywords if w.strip()]
+        deals = [
+            d for d in deals
+            if not any(w in f"{d['title']} {d['retailer']}".lower() for w in words)
+        ]
+    return deals
+
+
+def hide_deal(deal_id):
+    db = conn()
+    db.execute("UPDATE deals SET hidden=1 WHERE id=?", (deal_id,))
+    db.commit()
 
 
 def clear_new_flags(ids):

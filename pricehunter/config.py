@@ -31,6 +31,12 @@ DEFAULTS = {
     # Extra deal feeds, polled alongside the main listing.
     "source_camelcamelcamel": True,
     "source_slickdeals": True,
+    "source_slickdeals_popular": True,
+    "source_techbargains": True,
+    # Product types to hide. Books are on by default because Kindle price drops
+    # otherwise dominate the Amazon feeds.
+    "excluded_categories": ["books"],
+    "exclude_keywords": "",
     "amazon_live_check": False,
     "amazon_min_gap": 25,
     "amazon_hourly_cap": 12,

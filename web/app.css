@@ -1,31 +1,64 @@
 :root {
-  --bg: #0d1117;
-  --panel: #161b22;
-  --panel-2: #1c2430;
-  --border: #2a3441;
-  --text: #e6edf3;
-  --muted: #8b97a6;
+  --bg: #000000;
+  --panel: rgba(255, 255, 255, .045);
+  --panel-2: rgba(255, 255, 255, .07);
+  --border: rgba(255, 255, 255, .1);
+  --border-strong: rgba(255, 255, 255, .18);
+  --text: #f5f5f7;
+  --muted: #86868b;
   --brand: #ff7a18;
-  --error: #ff4d5e;
-  --strong: #f5a524;
-  --ok: #2ecc71;
-  --radius: 14px;
+  --error: #ff453a;
+  --strong: #ffd60a;
+  --ok: #30d158;
+  --radius: 18px;
+  --radius-lg: 24px;
+
+  /* Apple leans on a gentle overshoot for motion and a long, soft ease for
+     anything that travels a distance. */
+  --spring: cubic-bezier(.34, 1.56, .64, 1);
+  --ease: cubic-bezier(.25, .1, .25, 1);
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
 }
 
 * { box-sizing: border-box; }
 
-html { background: var(--bg); }
+html {
+  background: var(--bg);
+  scroll-behavior: smooth;
+}
 
 body {
   margin: 0;
   background-color: var(--bg);
-  background-image: radial-gradient(1200px 600px at 20% -10%, #1a2332 0%, var(--bg) 55%);
+  background-image:
+    radial-gradient(900px 520px at 12% -8%, rgba(255, 122, 24, .13) 0%, transparent 60%),
+    radial-gradient(760px 480px at 88% 0%, rgba(10, 132, 255, .10) 0%, transparent 62%);
+  background-attachment: fixed;
   color: var(--text);
-  font: 15px/1.5 "Segoe UI", system-ui, sans-serif;
+  font: 15px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI",
+        system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -.01em;
   min-height: 100vh;
 }
 
 .hidden { display: none !important; }
+
+/* Cards fade up as they enter the viewport; the observer adds .in-view.
+   Anything already visible on load is revealed immediately by the script. */
+.reveal {
+  opacity: 0;
+  transform: translateY(26px) scale(.985);
+  transition: opacity .62s var(--ease-out), transform .62s var(--ease-out);
+  will-change: opacity, transform;
+}
+.reveal.in-view { opacity: 1; transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .reveal { opacity: 1; transform: none; transition: none; }
+  * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+}
 
 /* ---------- top bar ---------- */
 .topbar {
@@ -33,28 +66,36 @@ body {
   justify-content: space-between;
   align-items: center;
   gap: 20px;
-  padding: 18px 26px;
-  background: rgba(13, 17, 23, .85);
+  padding: 16px 32px;
+  background: rgba(0, 0, 0, .72);
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
   z-index: 30;
-  backdrop-filter: blur(10px);
+  backdrop-filter: saturate(180%) blur(22px);
+  -webkit-backdrop-filter: saturate(180%) blur(22px);
   flex-wrap: wrap;
 }
 
 .brand { display: flex; align-items: center; gap: 14px; }
 
 .logo {
-  width: 42px; height: 42px;
+  width: 40px; height: 40px;
   display: grid; place-items: center;
   border-radius: 12px;
   background: linear-gradient(135deg, var(--brand), #ff3d3d);
-  font-size: 20px;
-  box-shadow: 0 6px 18px rgba(255, 122, 24, .32);
+  font-size: 19px;
+  box-shadow: 0 8px 24px rgba(255, 122, 24, .34);
+  transition: transform .5s var(--spring);
 }
+.brand:hover .logo { transform: scale(1.08) rotate(-4deg); }
 
-h1 { margin: 0; font-size: 18px; letter-spacing: .2px; }
+h1 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -.02em;
+}
 .sub { margin: 0; color: var(--muted); font-size: 12.5px; }
 
 .status { display: flex; align-items: center; gap: 14px; }
@@ -82,14 +123,29 @@ h1 { margin: 0; font-size: 18px; letter-spacing: .2px; }
   background: var(--panel-2);
   border: 1px solid var(--border);
   color: var(--text);
-  padding: 8px 14px;
-  border-radius: 9px;
+  padding: 8px 16px;
+  border-radius: 980px;               /* Apple's pill button */
   cursor: pointer;
   font-size: 13px;
-  transition: .16s;
+  font-weight: 500;
+  letter-spacing: -.01em;
+  transition: transform .35s var(--spring), background .25s var(--ease),
+              border-color .25s var(--ease), color .25s var(--ease);
 }
-.btn:hover:not(:disabled) { border-color: var(--brand); color: var(--brand); }
-.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: rgba(255, 255, 255, .12);
+  transform: translateY(-1px);
+}
+.btn:active:not(:disabled) { transform: scale(.96); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+
+.btn.primary {
+  background: var(--brand);
+  border-color: transparent;
+  color: #fff;
+}
+.btn.primary:hover:not(:disabled) { background: #ff8f3d; }
 
 /* Anchors styled as buttons need the link decoration stripped. */
 a.linkbtn { text-decoration: none; display: inline-flex; align-items: center; }
@@ -176,26 +232,177 @@ a.linkbtn { text-decoration: none; display: inline-flex; align-items: center; }
 .counts { font-size: 12.5px; color: var(--muted); }
 .counts b { color: var(--text); }
 
+/* ---------- hide products panel ---------- */
+.hidepanel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 26px;
+  margin: 0 32px;
+  padding: 22px 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  animation: panelIn .45s var(--ease-out) both;
+}
+
+@keyframes panelIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.hidepanel h3 {
+  margin: 0 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.catlist { display: flex; flex-wrap: wrap; gap: 9px; }
+
+/* Selectable pills rather than raw checkboxes. */
+.catpill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border-radius: 980px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+  transition: transform .35s var(--spring), background .25s var(--ease),
+              color .25s var(--ease), border-color .25s var(--ease);
+}
+.catpill:hover { transform: translateY(-1px); border-color: var(--border-strong); }
+.catpill:active { transform: scale(.96); }
+.catpill input { display: none; }
+.catpill.on {
+  background: rgba(255, 122, 24, .16);
+  border-color: rgba(255, 122, 24, .5);
+  color: var(--brand);
+}
+.catpill .tick { opacity: 0; transition: opacity .2s var(--ease); font-size: 11px; }
+.catpill.on .tick { opacity: 1; }
+
+.kwinput {
+  width: 100%;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  color: var(--text);
+  padding: 10px 13px;
+  font-size: 13.5px;
+  font-family: inherit;
+  transition: border-color .25s var(--ease), background .25s var(--ease);
+}
+.kwinput:focus {
+  outline: none;
+  border-color: rgba(255, 122, 24, .6);
+  background: rgba(255, 255, 255, .09);
+}
+
+.hidehint { margin: 9px 0 0; font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+
+.hidecard {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 980px;
+  transition: background .2s var(--ease), color .2s var(--ease);
+}
+.hidecard:hover { background: rgba(255, 69, 58, .16); color: var(--error); }
+
 /* ---------- alert ---------- */
 .alert {
-  margin: 14px 26px 0;
-  padding: 12px 16px;
-  border-radius: 10px;
-  background: linear-gradient(90deg, rgba(255, 77, 94, .18), transparent);
-  border: 1px solid rgba(255, 77, 94, .4);
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 60;
+  width: min(400px, calc(100vw - 48px));
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  background: rgba(28, 28, 30, .82);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .6);
+  backdrop-filter: saturate(180%) blur(24px);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
   font-size: 13.5px;
+  cursor: pointer;
+  animation: alertIn .55s var(--spring) both;
+  transition: transform .35s var(--spring), background .25s var(--ease);
 }
+.alert:hover { transform: translateY(-3px); background: rgba(40, 40, 44, .9); }
+.alert:active { transform: scale(.985); }
+
+@keyframes alertIn {
+  from { opacity: 0; transform: translateY(26px) scale(.95); }
+  to   { opacity: 1; transform: none; }
+}
+
+.alertthumb {
+  width: 52px; height: 52px;
+  border-radius: 11px;
+  background: #fff;
+  flex-shrink: 0;
+  object-fit: contain;
+  padding: 4px;
+}
+
+.alertbody { flex: 1; min-width: 0; }
+.alertkicker {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--brand);
+  margin-bottom: 3px;
+}
+.alerttitle {
+  display: block;
+  font-weight: 500;
+  line-height: 1.35;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.alertmeta { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+.alertclose {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 19px;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 50%;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background .2s var(--ease), color .2s var(--ease);
+}
+.alertclose:hover { background: rgba(255, 255, 255, .12); color: var(--text); }
 
 /* ---------- grid ---------- */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
-  gap: 16px;
-  padding: 20px 26px 40px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 22px;
+  padding: 30px 32px 72px;
   align-items: start;
 }
 
-.empty { text-align: center; color: var(--muted); padding: 40px; }
+.empty { text-align: center; color: var(--muted); padding: 70px 30px; font-size: 15px; }
 
 .card {
   background: var(--panel);
@@ -203,18 +410,39 @@ a.linkbtn { text-decoration: none; display: inline-flex; align-items: center; }
   border-radius: var(--radius);
   overflow: hidden;
   cursor: pointer;
-  transition: transform .18s, border-color .18s, box-shadow .18s;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  transition: transform .5s var(--spring), border-color .3s var(--ease),
+              box-shadow .45s var(--ease-out), background .3s var(--ease);
 }
-.card:hover { transform: translateY(-3px); border-color: #3b4a5c; box-shadow: 0 12px 28px rgba(0, 0, 0, .4); }
-.card.open { grid-column: 1 / -1; cursor: default; border-color: var(--brand); }
+.card:hover {
+  transform: translateY(-6px);
+  border-color: var(--border-strong);
+  background: var(--panel-2);
+  box-shadow: 0 22px 50px rgba(0, 0, 0, .55);
+}
+.card:active { transform: translateY(-2px) scale(.995); }
+
+.card.open {
+  grid-column: 1 / -1;
+  cursor: default;
+  border-color: rgba(255, 122, 24, .5);
+  box-shadow: 0 26px 70px rgba(0, 0, 0, .6);
+  transform: none;
+}
 
 .card .thumb {
   position: relative;
   background: #fff;
-  height: 158px;
+  height: 172px;
   overflow: hidden;
 }
-.card.open .thumb { height: 300px; }
+.card.open .thumb { height: 330px; }
+
+/* A slow zoom on hover, the way Apple treats product photography. */
+.card .thumb img { transition: transform .8s var(--ease-out); }
+.card:hover .thumb img { transform: scale(1.05); }
+.card.open:hover .thumb img { transform: none; }
 
 /* Absolute positioning against the fixed-height box, because a percentage
    max-height on a grid/flex child does not resolve and the image escapes. */

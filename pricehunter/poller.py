@@ -232,15 +232,11 @@ class Poller:
                 "title": best["title"],
                 "score": best["score"],
                 "id": best["id"],
+                # Without a URL the alert has nothing to open, which is why
+                # clicking it used to do nothing.
+                "url": best.get("direct_url") or best.get("out_url") or best.get("url"),
+                "retailer": best.get("retailer") or "",
+                "price": best.get("price"),
+                "discount_pct": best.get("discount_pct"),
+                "image": best.get("image") or "",
             }
-            if cfg["sound_alerts"]:
-                _beep()
-
-
-def _beep():
-    try:
-        import winsound
-
-        winsound.MessageBeep(winsound.MB_ICONEXCLAMATION)
-    except Exception:
-        pass

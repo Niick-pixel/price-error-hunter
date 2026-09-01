@@ -13,7 +13,7 @@
     <span class="logo">◆</span>
     <div>
       <h1>Price Error Hunter</h1>
-      <p class="sub" id="feedline">Watching Hidden Clearances</p>
+      <p class="sub" id="feedline">Watching 5 deal feeds</p>
     </div>
   </div>
 
@@ -79,8 +79,25 @@
       <input type="checkbox" id="livecheck">
       <span>Live Amazon check</span>
     </label>
+    <button class="btn" id="hidebtn" aria-expanded="false">Hide products…</button>
   </div>
   <div class="counts" id="counts"></div>
+</section>
+
+<section id="hidepanel" class="hidepanel hidden">
+  <div class="hidecol">
+    <h3>Hide these product types</h3>
+    <div id="categories" class="catlist"></div>
+  </div>
+  <div class="hidecol">
+    <h3>Hide titles containing</h3>
+    <input type="text" id="keywords" class="kwinput"
+           placeholder="e.g. novel, gift card, vitamin" autocomplete="off">
+    <p class="hidehint">
+      Comma separated. Title matching catches most books, but a few slip through
+      with no bookish words in the name — add them here, or use Hide on any card.
+    </p>
+  </div>
 </section>
 
 <p id="amazonnote" class="note hidden"></p>
