@@ -60,18 +60,26 @@ function buildCard(deal) {
 
   // thumbnail
   const thumb = el("div", "thumb");
+  const fallback = buildThumbFallback(deal);
+  thumb.append(fallback);
+
   const img = safeUrl(deal.image);
   if (img) {
     const image = new Image();
     image.src = img;
     image.alt = deal.title || "";
     image.loading = "lazy";
-    // Some retailers block hotlinking; drop the node rather than show a broken icon.
-    image.onerror = () => image.remove();
-    // Amazon answers unknown ASINs with a 1px placeholder that "loads" fine but
-    // renders as an empty box, so treat anything tiny as no image at all.
+    const drop = () => {
+      image.remove();
+      thumb.classList.remove("hasimg");
+    };
+    // Some retailers block hotlinking; show the fallback rather than a broken icon.
+    image.onerror = drop;
+    // Amazon's by-ASIN path answers with a 43-byte 1px placeholder for most
+    // non-book ASINs. It "loads" fine, so size is the only way to spot it.
     image.onload = () => {
-      if (image.naturalWidth < 32 || image.naturalHeight < 32) image.remove();
+      if (image.naturalWidth < 32 || image.naturalHeight < 32) drop();
+      else thumb.classList.add("hasimg");
     };
     thumb.append(image);
   }
@@ -183,6 +191,16 @@ function buildDetail(deal) {
   return wrap;
 }
 
+/* Sits behind the image. When no usable artwork exists the card shows this
+   instead of an empty white rectangle, so it reads as designed, not broken. */
+function buildThumbFallback(deal) {
+  const box = el("div", "thumbfallback");
+  const word = (deal.title || "?").replace(/^[^A-Za-z0-9]+/, "");
+  box.append(el("span", "fbinitial", (word[0] || "?").toUpperCase()));
+  box.append(el("span", "fbname", deal.retailer || "Deal"));
+  return box;
+}
+
 function hostLabel(url) {
   try {
     return new URL(url).hostname.replace(/^www\./, "");
@@ -250,6 +268,23 @@ function buildAmazonPanel(deal) {
 
 /* Cards fade up as they scroll into view. Anything already on screen at render
    time is revealed straight away, so the first paint never looks empty. */
+const revealed = new Set();
+let revealTimer = null;
+
+/* Safety net. A decorative animation must never decide whether content is
+   visible: if the observer has not fired shortly after a render - hidden tab,
+   zero-size viewport, no IntersectionObserver - reveal everything outright. */
+function scheduleRevealFallback() {
+  clearTimeout(revealTimer);
+  revealTimer = setTimeout(() => {
+    document.querySelectorAll(".card.reveal:not(.in-view)").forEach((card) => {
+      card.style.transitionDelay = "0ms";
+      card.classList.add("in-view");
+      if (card.dataset.id) revealed.add(card.dataset.id);
+    });
+  }, 1400);
+}
+
 const revealer =
   "IntersectionObserver" in window
     ? new IntersectionObserver(
@@ -257,6 +292,7 @@ const revealer =
           entries.forEach((entry) => {
             if (!entry.isIntersecting) return;
             entry.target.classList.add("in-view");
+            if (entry.target.dataset.id) revealed.add(entry.target.dataset.id);
             obs.unobserve(entry.target);
           }),
         { rootMargin: "0px 0px -8% 0px", threshold: 0.05 }
@@ -267,16 +303,21 @@ function render(deals) {
   window.__deals = deals;
   const grid = $("grid");
   grid.replaceChildren();
+  // Skip the animation entirely for a hidden tab: the observer never fires
+  // there, and content must not depend on it.
+  const animate = revealer && !document.hidden;
   deals.forEach((d, index) => {
     const card = buildCard(d);
-    if (revealer && d.id !== openId) {
+    // Only animate a card the first time it is seen. The grid is rebuilt on
+    // every poll, so re-animating made the whole page bounce every refresh.
+    if (animate && d.id !== openId && !revealed.has(d.id)) {
       card.classList.add("reveal");
-      // Stagger only the first screenful; later rows animate on scroll.
       card.style.transitionDelay = index < 12 ? `${Math.min(index, 11) * 45}ms` : "0ms";
       revealer.observe(card);
     }
     grid.append(card);
   });
+  scheduleRevealFallback();
 
   $("empty").classList.toggle("hidden", deals.length > 0);
   if (!deals.length) $("empty").textContent = "No deals match these filters yet.";

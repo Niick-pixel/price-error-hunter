@@ -47,7 +47,12 @@ AMAZON_DP = re.compile(r"amazon\.com/(?:dp|gp/product)/([A-Z0-9]{10})", re.I)
 
 
 def amazon_image(asin):
-    """Amazon's public image-by-ASIN endpoint; no product page fetch needed."""
+    """Amazon's legacy image-by-ASIN endpoint.
+
+    Only worth using as a last resort: it serves a 43-byte placeholder for most
+    modern ASINs and really only has artwork for books and other media. The UI
+    drops anything that comes back tiny and shows a placeholder tile instead.
+    """
     return f"https://m.media-amazon.com/images/P/{asin}.01._SCLZZZZZZZ_.jpg"
 
 RETAILER_TAG = re.compile(r"\[([a-z0-9.-]+\.[a-z]{2,})\]", re.I)
@@ -287,7 +292,9 @@ class TechBargains:
                 "list_price": None,
                 "discount_pct": 0.0,
                 "savings": 0.0,
-                "image": amazon_image(asin) if asin else "",
+                # The feed carries a real thumbnail on its own CDN; prefer it,
+                # because Amazon's by-ASIN path only has art for books.
+                "image": entry["image"] or (amazon_image(asin) if asin else ""),
                 "age_text": _age_text(entry["pub_date"]),
                 "asin": asin,
                 "direct_url": f"https://www.amazon.com/dp/{asin}" if asin else link,

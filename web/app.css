@@ -433,9 +433,40 @@ a.linkbtn { text-decoration: none; display: inline-flex; align-items: center; }
 
 .card .thumb {
   position: relative;
-  background: #fff;
+  /* Dark until a real image arrives, so a missing thumbnail is never a
+     glaring white rectangle. .hasimg switches it to the photo backdrop. */
+  background: linear-gradient(150deg, #1c1c1e, #121214);
   height: 172px;
   overflow: hidden;
+  transition: background .3s var(--ease);
+}
+.card .thumb.hasimg { background: #fff; }
+
+.thumbfallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--muted);
+  pointer-events: none;
+}
+.thumb.hasimg .thumbfallback { display: none; }
+
+.fbinitial {
+  font-size: 34px;
+  font-weight: 600;
+  letter-spacing: -.03em;
+  color: rgba(255, 255, 255, .28);
+  line-height: 1;
+}
+.fbname {
+  font-size: 10.5px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, .3);
 }
 .card.open .thumb { height: 330px; }
 
