@@ -125,20 +125,30 @@ class Handler(BaseHTTPRequestHandler):
 
     def _api_deals(self, query):
         cfg = config.load()
-        amazon_only = (query.get("amazon", [""])[0] or "").lower() in ("1", "true")
+        section = (query.get("section", ["feed"])[0] or "feed").lower()
+        if section not in store.SECTIONS:
+            section = "feed"
         try:
             min_discount = float(query.get("min", ["0"])[0] or 0)
         except ValueError:
             min_discount = 0
         sort = query.get("sort", [cfg["sort"]])[0]
         keywords = [w for w in (cfg.get("exclude_keywords") or "").split(",") if w.strip()]
-        deals = store.list_deals(
-            amazon_only=amazon_only, min_discount=min_discount, sort=sort,
+        # One query serves the listing and every tab count, so a tab can never
+        # advertise a number the list does not actually contain.
+        everything = store.list_deals(
+            section="feed", min_discount=min_discount, sort=sort,
             exclude_categories=cfg.get("excluded_categories") or (),
             exclude_keywords=keywords,
         )
+        counts = {
+            name: sum(1 for d in everything if store.in_section(d, name))
+            for name in store.SECTIONS
+        }
+        deals = [d for d in everything if store.in_section(d, section)]
         self._json({
             "deals": deals,
+            "counts": counts,
             "status": self._status(),
             "settings": cfg,
             "categories": filters.category_labels(),

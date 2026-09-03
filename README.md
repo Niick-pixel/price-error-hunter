@@ -88,6 +88,7 @@ never stops the others, and each source only ever expires its own deals.
 | **Slickdeals front page** | Community-vetted deals across many retailers, roughly half Amazon |
 | **Slickdeals popular** | Runs deeper than the front page and only partly overlaps it |
 | **TechBargains** | Amazon-heavy; its links are already product URLs, so ASINs come free |
+| **Woot** | Woot deals via Slickdeals' search feed, since Woot's own RSS is retired |
 
 Together they bring in around 150 live deals per cycle.
 
@@ -143,13 +144,24 @@ caught**. It is not perfect: a title like *Habsburgs on the Rio Grande* at $14.7
 sits above the price band and stays. For those, use the keyword box or the
 **Hide this deal** button on any card, which removes it permanently.
 
-## Two sections
+## Three sections
 
 The tabs at the top split the app in two:
 
-- **Deals Feed** — everything the Hidden Clearances online feed is carrying.
+- **Deals Feed** — everything all five feeds are carrying.
 - **Amazon** — only deals that resolve to an Amazon product, each with its ASIN,
   a direct product link, and a real Amazon price-history chart.
+- **Woot** — Woot deals gathered from every source, not just the Woot feed.
+
+A tab is a view over the same query rather than a separate fetch: one request
+returns the listing and all three counts, so a tab can never advertise a number
+its own list disagrees with. Membership is decided in Python
+(`store.in_section`) for the same reason — counts and listing run through
+identical logic.
+
+Note on Woot: its own RSS is gone, every documented endpoint now 404s. The
+`woot` source reads Slickdeals' search feed instead and drops anything that
+does not resolve to woot.com, so neighbouring sites are never mislabelled.
 
 ## Links go straight to the product
 

@@ -24,6 +24,9 @@ const SOURCE_LABEL = {
   hiddenclearances: "Hidden Clearances",
   camelcamelcamel: "Camel drops",
   slickdeals: "Slickdeals",
+  slickdeals_popular: "Slickdeals popular",
+  techbargains: "TechBargains",
+  woot: "Woot feed",
 };
 
 /* Discount at which a card gets the animated glow border. */
@@ -727,7 +730,7 @@ function selectedCategories() {
 
 async function load() {
   const params = new URLSearchParams({
-    amazon: view === "amazon" ? "1" : "0",
+    section: view,
     min: $("mindiscount").value,
     sort: $("sort").value,
   });
@@ -737,22 +740,21 @@ async function load() {
     applySettings(data.settings);
     applyStatus(data.status);
     render(data.deals);
-    refreshTabCounts();
+    applyTabCounts(data.counts);
   } catch (err) {
     $("laststate").textContent = "lost contact with the local service";
     $("pulse").className = "pulse bad";
   }
 }
 
-/* Counts for the inactive tab need their own lookup. */
-async function refreshTabCounts() {
-  const other = view === "amazon" ? "0" : "1";
-  try {
-    const data = await api(`/api/deals?amazon=${other}&min=${$("mindiscount").value}`);
-    const mine = document.querySelectorAll(".card").length;
-    $(view === "amazon" ? "count-amazon" : "count-feed").textContent = mine;
-    $(view === "amazon" ? "count-feed" : "count-amazon").textContent = data.deals.length;
-  } catch {}
+/* Every tab count arrives with the listing, so no extra request and no chance
+   of a tab showing a number the list disagrees with. */
+function applyTabCounts(counts) {
+  if (!counts) return;
+  Object.keys(counts).forEach((name) => {
+    const el = document.getElementById("count-" + name);
+    if (el) el.textContent = counts[name];
+  });
 }
 
 function setView(next) {

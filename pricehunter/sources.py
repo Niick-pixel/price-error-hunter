@@ -26,6 +26,10 @@ SLICKDEALS_POPULAR = (
     "https://slickdeals.net/newsearch.php"
     "?mode=popdeals&searcharea=deals&searchin=first&rss=1"
 )
+SLICKDEALS_WOOT = (
+    "https://slickdeals.net/newsearch.php"
+    "?q=woot&searcharea=deals&searchin=first&rss=1"
+)
 TECHBARGAINS_FEED = "https://www.techbargains.com/rss.xml"
 
 # TechBargains puts the price at the end of the title: "... Jumper Cables $33.33"
@@ -255,6 +259,30 @@ class SlickdealsPopular(Slickdeals):
     feed = SLICKDEALS_POPULAR
 
 
+class SlickdealsWoot(Slickdeals):
+    """Woot deals via Slickdeals' search feed.
+
+    Woot retired its own RSS - every documented endpoint now 404s - so this is
+    the remaining way to watch it without scraping. The search returns some
+    neighbouring sites, so anything that does not resolve to woot.com is
+    dropped rather than mislabelled.
+    """
+
+    name = "woot"
+    label = "Woot"
+    feed = SLICKDEALS_WOOT
+
+    def fetch(self, session, timeout):
+        out = []
+        for item in Slickdeals.fetch(self, session, timeout):
+            blob = (item["url"] + " " + item["title"]).lower()
+            if "woot" not in item["retailer"].lower() and "woot" not in blob:
+                continue
+            item["retailer"] = "Woot"
+            out.append(item)
+        return out
+
+
 class TechBargains:
     """Amazon-heavy feed whose links are already product URLs, so ASINs are free."""
 
@@ -310,4 +338,5 @@ def _host_label(url):
     return host.split(".")[0].replace("-", " ").title() if host else "Unknown"
 
 
-ALL = (CamelTopDrops(), Slickdeals(), SlickdealsPopular(), TechBargains())
+ALL = (CamelTopDrops(), Slickdeals(), SlickdealsPopular(), SlickdealsWoot(),
+       TechBargains())

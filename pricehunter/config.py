@@ -36,6 +36,7 @@ DEFAULTS = {
     "source_camelcamelcamel": True,
     "source_slickdeals": True,
     "source_slickdeals_popular": True,
+    "source_woot": True,
     "source_techbargains": True,
     # Product types to hide. Books are on by default because Kindle price drops
     # otherwise dominate the Amazon feeds.

@@ -271,7 +271,30 @@ def get(deal_id):
     return _to_dict(row) if row else None
 
 
-def list_deals(amazon_only=False, min_discount=0, sort="score", limit=300,
+SECTIONS = ("feed", "amazon", "woot")
+
+
+def in_section(deal, section):
+    """Which tab a deal belongs to.
+
+    Kept in Python rather than SQL so the tab counts and the listing can never
+    disagree about what belongs where.
+    """
+    if section == "amazon":
+        # Some deals are filed under a generic retailer but still resolve to an
+        # Amazon product, so a known ASIN is proof enough.
+        return ((deal.get("retailer") or "").lower() == "amazon"
+                or bool(deal.get("asin")))
+    if section == "woot":
+        blob = " ".join([
+            deal.get("retailer") or "", deal.get("direct_url") or "",
+            deal.get("url") or "", deal.get("source") or "",
+        ]).lower()
+        return "woot" in blob
+    return True
+
+
+def list_deals(section="feed", min_discount=0, sort="score", limit=300,
                exclude_categories=(), exclude_keywords=()):
     where = ["gone=0", "hidden=0"]
     args = []
@@ -279,10 +302,6 @@ def list_deals(amazon_only=False, min_discount=0, sort="score", limit=300,
         marks = ",".join("?" * len(exclude_categories))
         where.append(f"(category IS NULL OR category NOT IN ({marks}))")
         args.extend(exclude_categories)
-    if amazon_only:
-        # Some deals are filed under a generic retailer but still resolve to an
-        # Amazon product, so treat a known ASIN as proof it belongs here.
-        where.append("(LOWER(retailer)='amazon' OR (asin IS NOT NULL AND asin<>''))")
     if min_discount:
         where.append("discount_pct >= ?")
         args.append(min_discount)
@@ -299,7 +318,7 @@ def list_deals(amazon_only=False, min_discount=0, sort="score", limit=300,
         f"SELECT * FROM deals WHERE {' AND '.join(where)} ORDER BY {order} LIMIT ?",
         args,
     ).fetchall()
-    deals = [_to_dict(r) for r in rows]
+    deals = [d for d in (_to_dict(r) for r in rows) if in_section(d, section)]
     if exclude_keywords:
         # Free-text exclusions are matched in Python so users can type a plain
         # comma-separated list without it becoming a pile of SQL LIKEs.
