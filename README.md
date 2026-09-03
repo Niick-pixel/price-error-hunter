@@ -28,16 +28,19 @@ tab is in the background.
 
 ### The glow
 
-Any deal at **50% off or more** is backlit: a warm halo spills out behind the
-card and breathes slowly, so the strongest finds are obvious while scrolling
-without needing another badge. It is a light behind the card, not an outline —
-the border itself stays ordinary, just faintly warmed.
+Any deal at **50% off or more** is backlit with the same palette as the
+full-screen overlay: magenta, coral, indigo and cyan blooming behind the card
+and slowly trading corners over a 9s lap, so the strongest finds are obvious
+while scrolling without needing another badge. It is light behind the card, not
+an outline.
 
-It has to be a `box-shadow` rather than a blurred pseudo-element, because
-`.card` sets `overflow: hidden` for the image zoom and would clip a child.
-Shadows paint outside the border box and escape that clip. Under
-`prefers-reduced-motion` the breathing stops and a steady halo remains. The
-threshold is `GLOW_DISCOUNT` at the top of `web/app.js`.
+Four offset coloured `box-shadow`s rather than a blurred pseudo-element, for
+two reasons: `.card` sets `overflow: hidden` for the image zoom, which would
+clip a child, and a negative z-index child paints *over* the parent's own
+background rather than behind it. A shadow paints strictly outside the border
+box, so it reads as a backlight with no clipping workaround and no stray edge.
+Under `prefers-reduced-motion` the rotation stops and a static four-hue halo
+remains. The threshold is `GLOW_DISCOUNT` at the top of `web/app.js`.
 
 ### Screen glow
 

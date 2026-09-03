@@ -567,34 +567,63 @@ body.modal-open { overflow: hidden; }
    This has to be box-shadow rather than a blurred pseudo-element, because
    .card sets overflow:hidden for the image zoom, which would clip a child.
    Shadows are painted outside the border box and escape that clip. */
+/* Four offset colour shadows, one per corner, drifting round the card so the
+   hues trade places. Same palette as the full-screen SiriGlow overlay.
+
+   Shadows rather than a blurred pseudo-element on purpose: .card sets
+   overflow:hidden for the image zoom, which would clip a child, and a
+   negative-z child would paint over the card's own background rather than
+   behind it. A box-shadow paints strictly outside the border box, so it reads
+   as light behind the card with no clipping workaround and no stray edge. */
 .card.glow {
-  border-color: rgba(255, 165, 90, .42);
-  animation: glowBreathe 4.5s var(--ease) infinite;
+  border-color: rgba(255, 255, 255, .18);
+  animation: cardAurora 9s linear infinite;
 }
 
-@keyframes glowBreathe {
+@keyframes cardAurora {
   0%, 100% {
-    box-shadow: 0 0 34px -2px rgba(255, 145, 45, .58),
-                0 0 78px -16px rgba(255, 120, 20, .42);
+    box-shadow: -20px -14px 38px -6px rgba(255,  45, 149, .55),
+                 20px -14px 38px -6px rgba(255, 138,  61, .50),
+                 20px  18px 42px -6px rgba( 34, 211, 238, .50),
+                -20px  18px 42px -6px rgba(123,  92, 255, .52);
+  }
+  25% {
+    box-shadow: -20px -14px 38px -6px rgba(123,  92, 255, .52),
+                 20px -14px 38px -6px rgba(255,  45, 149, .55),
+                 20px  18px 42px -6px rgba(255, 138,  61, .50),
+                -20px  18px 42px -6px rgba( 34, 211, 238, .50);
   }
   50% {
-    box-shadow: 0 0 52px 2px rgba(255, 162, 72, .82),
-                0 0 118px -12px rgba(255, 130, 30, .60);
+    box-shadow: -20px -14px 38px -6px rgba( 34, 211, 238, .50),
+                 20px -14px 38px -6px rgba(123,  92, 255, .52),
+                 20px  18px 42px -6px rgba(255,  45, 149, .55),
+                -20px  18px 42px -6px rgba(255, 138,  61, .50);
+  }
+  75% {
+    box-shadow: -20px -14px 38px -6px rgba(255, 138,  61, .50),
+                 20px -14px 38px -6px rgba( 34, 211, 238, .50),
+                 20px  18px 42px -6px rgba(123,  92, 255, .52),
+                -20px  18px 42px -6px rgba(255,  45, 149, .55);
   }
 }
 
-/* Keep the lift shadow on hover, with the bloom layered over it. */
+/* Hover keeps the drift but adds the depth shadow underneath. */
 .card.glow:hover {
-  animation: none;
   box-shadow: 0 22px 50px rgba(0, 0, 0, .55),
-              0 0 56px 2px rgba(255, 165, 78, .88),
-              0 0 130px -12px rgba(255, 130, 30, .62);
+              -22px -16px 46px -4px rgba(255,  45, 149, .70),
+               22px -16px 46px -4px rgba(255, 138,  61, .62),
+               22px  20px 50px -4px rgba( 34, 211, 238, .62),
+              -22px  20px 50px -4px rgba(123,  92, 255, .66);
+  animation: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .card.glow {
     animation: none;
-    box-shadow: 0 0 44px 0 rgba(255, 152, 55, .65);
+    box-shadow: -20px -14px 38px -6px rgba(255,  45, 149, .50),
+                 20px -14px 38px -6px rgba(255, 138,  61, .46),
+                 20px  18px 42px -6px rgba( 34, 211, 238, .46),
+                -20px  18px 42px -6px rgba(123,  92, 255, .48);
   }
 }
 
