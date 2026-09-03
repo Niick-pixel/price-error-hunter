@@ -3,7 +3,7 @@ import threading
 import time
 import traceback
 
-from . import amazon, config, creators, scoring, scraper, sources, store
+from . import amazon, config, creators, filters, scoring, scraper, sources, store
 
 
 class Poller:
@@ -71,12 +71,13 @@ class Poller:
             cold_start = store.deal_count() == 0
             fresh = []
 
-            items, changed = self.scraper.fetch_listing()
-            if changed:
-                fresh += store.upsert_listing(items, source="hiddenclearances")
-                self.status["unchanged_streak"] = 0
-            else:
-                self.status["unchanged_streak"] += 1
+            if cfg.get("source_hiddenclearances", True):
+                items, changed = self.scraper.fetch_listing()
+                if changed:
+                    fresh += store.upsert_listing(items, source="hiddenclearances")
+                    self.status["unchanged_streak"] = 0
+                else:
+                    self.status["unchanged_streak"] += 1
 
             # Extra feeds run every cycle, independently of the main listing's
             # 304 handling, and one failing feed must not stop the others.
@@ -225,12 +226,21 @@ class Poller:
         if not fresh_ids or not alert:
             return
         cfg = config.load()
-        fresh = [d for d in (store.get(i) for i in fresh_ids) if d]
+        cats, words = filters.settings_filter(cfg)
+        # Hidden product types must not ring either. Filtering here covers both
+        # the banner and the sound-only pass below, since both read this list.
+        fresh = [
+            d for d in (store.get(i) for i in fresh_ids)
+            if d and not filters.suppressed(d, cats, words)
+        ]
+        if not fresh:
+            return
         best = None
         for deal in fresh:
             if best is None or deal["score"] > best["score"]:
                 best = deal
-        self.status["new_since_open"] += len(fresh_ids)
+        # Count what the user can actually see, not what was ingested.
+        self.status["new_since_open"] += len(fresh)
 
         banner_id = best["id"] if best and best["score"] >= cfg["alert_score"] else None
         self._note_sound_only(cfg, fresh, banner_id)

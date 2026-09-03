@@ -30,6 +30,11 @@ DEFAULTS = {
     # without showing a notification. 0 disables it.
     "sound_discount": 0,
     "screen_glow": True,
+    # Appearance, adjustable from the Settings tab.
+    "bg_theme": "charcoal",
+    "card_glow": True,
+    "card_glow_discount": 50,
+    "source_hiddenclearances": True,
     # Live Amazon lookups. Off by default: Amazon serves a CAPTCHA within a
     # couple of automated requests, so this is best-effort only.
     # Extra deal feeds, polled alongside the main listing.

@@ -40,6 +40,9 @@
     <span class="tabname">Woot</span>
     <span class="tabcount" id="count-woot">—</span>
   </button>
+  <button class="tab tabsettings" data-view="settings">
+    <span class="tabname">Settings</span>
+  </button>
 </nav>
 
 <section class="controls">
@@ -75,14 +78,6 @@
         <option value="1800">30 min</option>
       </select>
     </label>
-    <label class="toggle">
-      <input type="checkbox" id="sound">
-      <span>Sound alert</span>
-    </label>
-    <label class="toggle">
-      <input type="checkbox" id="screenglow">
-      <span title="Edge glow around the screen when something lands">Screen glow</span>
-    </label>
     <label class="field">
       <span title="Plays a chime only — no notification card">Chime at</span>
       <select id="sounddiscount">
@@ -94,29 +89,22 @@
         <option value="90">90%+ off</option>
       </select>
     </label>
+
+    <!-- Checkboxes last, after every dropdown. -->
+    <label class="toggle">
+      <input type="checkbox" id="sound">
+      <span>Sound alert</span>
+    </label>
+    <label class="toggle">
+      <input type="checkbox" id="screenglow">
+      <span title="Edge glow around the screen when something lands">Screen glow</span>
+    </label>
     <label class="toggle amazonopt hidden">
       <input type="checkbox" id="livecheck">
       <span>Live Amazon check</span>
     </label>
-    <button class="btn" id="hidebtn" aria-expanded="false">Hide products…</button>
   </div>
   <div class="counts" id="counts"></div>
-</section>
-
-<section id="hidepanel" class="hidepanel hidden">
-  <div class="hidecol">
-    <h3>Hide these product types</h3>
-    <div id="categories" class="catlist"></div>
-  </div>
-  <div class="hidecol">
-    <h3>Hide titles containing</h3>
-    <input type="text" id="keywords" class="kwinput"
-           placeholder="e.g. novel, gift card, vitamin" autocomplete="off">
-    <p class="hidehint">
-      Comma separated. Title matching catches most books, but a few slip through
-      with no bookish words in the name — add them here, or use Hide on any card.
-    </p>
-  </div>
 </section>
 
 <p id="amazonnote" class="note hidden"></p>
@@ -129,6 +117,71 @@
     <div id="modalbody"></div>
   </div>
 </div>
+
+<section id="settingsview" class="settingsview hidden">
+
+  <div class="setcard">
+    <h3>Appearance</h3>
+
+    <div class="setrow">
+      <label class="setlabel">Background</label>
+      <div id="themes" class="swatches"></div>
+    </div>
+
+    <div class="setrow">
+      <label class="setlabel" for="cardglow">
+        Card glow <span class="setnote">deals at or above this discount get the aurora</span>
+      </label>
+      <div class="rangerow">
+        <input type="range" id="cardglow" min="0" max="95" step="5" value="50">
+        <output id="o-cardglow">50%</output>
+      </div>
+    </div>
+
+    <label class="toggle setinline">
+      <input type="checkbox" id="cardglowon">
+      <span>Enable card glow</span>
+    </label>
+  </div>
+
+  <div class="setcard">
+    <h3>Alerts</h3>
+    <div class="setrow">
+      <label class="setlabel" for="alertscore">
+        Notify at score <span class="setnote">how strong a find must be to raise a card</span>
+      </label>
+      <div class="rangerow">
+        <input type="range" id="alertscore" min="40" max="100" step="5" value="75">
+        <output id="o-alertscore">75</output>
+      </div>
+    </div>
+    <p class="sethint">
+      Hidden product types never raise an alert, whatever they score.
+    </p>
+  </div>
+
+  <div class="setcard">
+    <h3>Deal sources</h3>
+    <div id="sourcelist" class="catlist"></div>
+    <p class="sethint">Turning one off stops polling it on the next cycle.</p>
+  </div>
+
+  <div class="setcard">
+    <h3>Hidden product types</h3>
+    <div id="categories" class="catlist"></div>
+
+    <div class="setrow" style="margin-top:16px">
+      <label class="setlabel" for="keywords">Hide titles containing</label>
+      <input type="text" id="keywords" class="kwinput"
+             placeholder="e.g. novel, gift card, vitamin" autocomplete="off">
+    </div>
+    <p class="sethint">
+      Comma separated. Title matching catches most books, but a few slip through
+      with no bookish words in the name — add them here, or use Hide on any card.
+    </p>
+  </div>
+
+</section>
 
 <main id="grid" class="grid"></main>
 <p id="empty" class="empty">Loading the deal feed…</p>

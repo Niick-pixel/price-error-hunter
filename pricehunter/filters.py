@@ -141,13 +141,31 @@ def _looks_like_cheap_media(deal, title):
     return len(title.split()) >= 2
 
 
-def excluded(deal, excluded_categories, keywords):
-    """True when a deal should be hidden."""
+def suppressed(deal, excluded_categories, keywords):
+    """True when a deal should not be shown - or alerted on.
+
+    The single place that decides visibility. The listing and the alert path
+    both call it, so a hidden product type can never still ring a notification.
+    Uses the category stored at ingest when present, falling back to
+    classifying on the spot for rows that predate it.
+    """
+    if deal.get("hidden"):
+        return True
     if excluded_categories:
-        category = classify(deal)
+        category = deal.get("category")
+        if category is None:
+            category = classify(deal)
         if category and category in excluded_categories:
             return True
     if keywords:
         haystack = f"{deal.get('title') or ''} {deal.get('retailer') or ''}".lower()
         return any(word and word.lower() in haystack for word in keywords)
     return False
+
+
+def settings_filter(cfg):
+    """Pull the two exclusion settings out of config in one place."""
+    return (
+        tuple(cfg.get("excluded_categories") or ()),
+        [w.strip() for w in (cfg.get("exclude_keywords") or "").split(",") if w.strip()],
+    )

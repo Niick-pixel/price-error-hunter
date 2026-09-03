@@ -113,9 +113,24 @@ against Amazon's Conditions of Use, and a good way to get an IP or account
 flagged. Reading feeds that already track Amazon prices gets the same answer,
 legitimately and far more reliably.
 
+## Settings
+
+The **Settings** tab holds everything that is set once and forgotten:
+
+- **Appearance** — six background themes, the discount at which cards get the
+  aurora glow, and a switch to turn that glow off.
+- **Alerts** — the score a find must reach to raise a notification card.
+- **Deal sources** — all six feeds, individually switchable. Turning one off
+  stops polling it on the next cycle.
+- **Hidden product types** — the category pills and keyword box.
+
+The toolbar keeps only what changes often, ordered dropdowns first and
+checkboxes last: min discount, sort, poll interval, chime threshold, then sound
+and screen glow.
+
 ## Hiding product types you do not care about
 
-**Hide products…** in the toolbar opens two controls:
+The controls live under **Settings → Hidden product types**:
 
 - **Category pills** — Books & Kindle, Food & drink, Vitamins & supplements,
   Beauty, Clothing. **Books are hidden by default**, because Kindle price drops
@@ -125,6 +140,11 @@ legitimately and far more reliably.
 
 Every deal is classified once at ingest and the category is stored, so toggling a
 pill re-filters instantly without re-fetching anything.
+
+**Hidden types never raise an alert.** Visibility is decided in exactly one
+place, `filters.suppressed`, which both the listing and the alert path call — so
+a hidden book cannot ring a notification no matter how high it scores. The "new"
+counter follows the same rule and counts only what you can actually see.
 
 ### How reliable is it?
 

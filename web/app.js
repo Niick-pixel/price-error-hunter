@@ -5,6 +5,7 @@ let openId = null;
 let settings = {};
 let firstLoad = true;
 let view = "feed";
+let dataSection = "feed";
 let lastAlertId = null;
 let lastSoundPing = null;
 
@@ -29,8 +30,27 @@ const SOURCE_LABEL = {
   woot: "Woot feed",
 };
 
-/* Discount at which a card gets the animated glow border. */
-const GLOW_DISCOUNT = 50;
+/* Default discount at which a card gets the aurora; overridden from settings. */
+let GLOW_DISCOUNT = 50;
+
+const BG_THEMES = {
+  charcoal: { label: "Charcoal", bg: "#202430", raised: "#2a2f3d" },
+  slate:    { label: "Slate",    bg: "#1b2130", raised: "#262d40" },
+  midnight: { label: "Midnight", bg: "#141824", raised: "#1e2333" },
+  ink:      { label: "Ink",      bg: "#0d1117", raised: "#161b22" },
+  graphite: { label: "Graphite", bg: "#26262b", raised: "#323238" },
+  cocoa:    { label: "Cocoa",    bg: "#241f1d", raised: "#302926" },
+};
+
+function applyTheme(name) {
+  const t = BG_THEMES[name] || BG_THEMES.charcoal;
+  const root = document.documentElement.style;
+  root.setProperty("--bg", t.bg);
+  root.setProperty("--bg-raised", t.raised);
+  document.querySelectorAll(".swatch").forEach((s) =>
+    s.classList.toggle("on", s.dataset.theme === name)
+  );
+}
 
 /* ---------- screen edge glow ----------
    Deliberately not tied to the background poll: that runs every couple of
@@ -101,7 +121,9 @@ function buildCard(deal) {
   const card = el("article", "card");
   card.dataset.id = deal.id;
   // Anything at or above this discount gets the animated edge glow.
-  if ((deal.discount_pct || 0) >= GLOW_DISCOUNT) card.classList.add("glow");
+  if (settings.card_glow !== false && (deal.discount_pct || 0) >= GLOW_DISCOUNT) {
+    card.classList.add("glow");
+  }
 
   // thumbnail
   const thumb = el("div", "thumb");
@@ -696,6 +718,14 @@ function applySettings(cfg) {
     $("keywords").value = cfg.exclude_keywords || "";
     $("sounddiscount").value = String(cfg.sound_discount || 0);
     $("screenglow").checked = cfg.screen_glow !== false;
+    $("cardglow").value = String(cfg.card_glow_discount ?? 50);
+    $("o-cardglow").textContent = `${cfg.card_glow_discount ?? 50}%`;
+    $("cardglowon").checked = cfg.card_glow !== false;
+    $("alertscore").value = String(cfg.alert_score ?? 75);
+    $("o-alertscore").textContent = String(cfg.alert_score ?? 75);
+    GLOW_DISCOUNT = cfg.card_glow_discount ?? 50;
+    buildSettings(cfg);
+    applyTheme(cfg.bg_theme || "charcoal");
     firstLoad = false;
   }
   // Created lazily so the WebGL context only exists when it is wanted.
@@ -728,9 +758,90 @@ function selectedCategories() {
   return [...document.querySelectorAll("#categories input:checked")].map((i) => i.value);
 }
 
+/* ---------- settings tab ---------- */
+
+const SOURCE_KEYS = [
+  ["source_hiddenclearances", "Hidden Clearances"],
+  ["source_camelcamelcamel", "Camel top drops"],
+  ["source_slickdeals", "Slickdeals"],
+  ["source_slickdeals_popular", "Slickdeals popular"],
+  ["source_woot", "Woot"],
+  ["source_techbargains", "TechBargains"],
+];
+
+let settingsBuilt = false;
+
+function buildSettings(cfg) {
+  if (settingsBuilt) return;
+  settingsBuilt = true;
+
+  const swatches = $("themes");
+  Object.keys(BG_THEMES).forEach((key) => {
+    const t = BG_THEMES[key];
+    const b = document.createElement("button");
+    b.className = "swatch";
+    b.dataset.theme = key;
+    b.title = t.label;
+    b.setAttribute("aria-label", t.label);
+    b.style.background = `linear-gradient(140deg, ${t.raised}, ${t.bg})`;
+    b.addEventListener("click", () => {
+      applyTheme(key);
+      saveSettings();
+    });
+    swatches.append(b);
+  });
+
+  const list = $("sourcelist");
+  SOURCE_KEYS.forEach(([key, label]) => {
+    const on = cfg[key] !== false;
+    const pill = el("label", "catpill" + (on ? " on" : ""));
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.checked = on;
+    input.dataset.key = key;
+    input.addEventListener("change", () => {
+      pill.classList.toggle("on", input.checked);
+      saveSettings();
+    });
+    pill.append(input, el("span", "tick", "✓"), el("span", null, label));
+    list.append(pill);
+  });
+
+  bindRange("cardglow", (v) => `${v}%`, (v) => {
+    GLOW_DISCOUNT = v;
+    cardCache.clear();               // glow state is baked into each card
+    render(window.__deals || []);
+  });
+  bindRange("alertscore", (v) => String(v), () => {});
+
+  $("cardglowon").addEventListener("change", () => {
+    saveSettings();
+    cardCache.clear();
+    render(window.__deals || []);
+  });
+}
+
+function bindRange(id, fmtFn, apply) {
+  const input = $(id);
+  const out = $("o-" + id);
+  input.addEventListener("input", () => {
+    out.textContent = fmtFn(Number(input.value));
+    apply(Number(input.value));
+  });
+  input.addEventListener("change", saveSettings);
+}
+
+function selectedSources() {
+  const out = {};
+  document.querySelectorAll("#sourcelist input").forEach((i) => {
+    out[i.dataset.key] = i.checked;
+  });
+  return out;
+}
+
 async function load() {
   const params = new URLSearchParams({
-    section: view,
+    section: dataSection,
     min: $("mindiscount").value,
     sort: $("sort").value,
   });
@@ -759,9 +870,17 @@ function applyTabCounts(counts) {
 
 function setView(next) {
   view = next;
+  // Settings is a panel, not a deal section, so the data query keeps whichever
+  // section was last open and returns to it when the tab is left.
+  const isSettings = next === "settings";
+  if (!isSettings) dataSection = next;
+
   document.querySelectorAll(".tab").forEach((t) =>
     t.classList.toggle("active", t.dataset.view === next)
   );
+  $("settingsview").classList.toggle("hidden", !isSettings);
+  $("grid").classList.toggle("hidden", isSettings);
+  document.querySelector(".controls").classList.toggle("hidden", isSettings);
   $("amazonnote").classList.toggle("hidden", next !== "amazon");
   document.querySelectorAll(".amazonopt").forEach((n) =>
     n.classList.toggle("hidden", next !== "amazon")
@@ -791,16 +910,14 @@ function saveSettings() {
     screen_glow: $("screenglow").checked,
     excluded_categories: selectedCategories(),
     exclude_keywords: $("keywords").value,
+    bg_theme: document.querySelector(".swatch.on")?.dataset.theme || "charcoal",
+    card_glow: $("cardglowon").checked,
+    card_glow_discount: Number($("cardglow").value),
+    alert_score: Number($("alertscore").value),
+    ...selectedSources(),
   };
   api("/api/settings", { method: "POST", body: JSON.stringify(payload) }).catch(() => {});
 }
-
-$("hidebtn").addEventListener("click", () => {
-  const panel = $("hidepanel");
-  const open = panel.classList.toggle("hidden");
-  $("hidebtn").setAttribute("aria-expanded", String(!open));
-  $("hidebtn").textContent = open ? "Hide products…" : "Done";
-});
 
 let kwTimer = null;
 $("keywords").addEventListener("input", () => {

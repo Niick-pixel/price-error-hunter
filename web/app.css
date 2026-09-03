@@ -252,6 +252,73 @@ a.linkbtn { text-decoration: none; display: inline-flex; align-items: center; }
 .counts { font-size: 12.5px; color: var(--muted); }
 .counts b { color: var(--text); }
 
+/* ---------- settings view ---------- */
+.tab.tabsettings { margin-left: auto; }
+
+.settingsview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+  gap: 20px;
+  padding: 28px 32px 64px;
+  align-items: start;
+}
+
+.setcard {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 22px 22px;
+  animation: panelIn .4s var(--ease-out) both;
+}
+
+.setcard h3 {
+  margin: 0 0 16px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.setrow { margin-bottom: 16px; }
+.setlabel { display: block; font-size: 13px; margin-bottom: 8px; }
+.setnote { display: block; font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.sethint { margin: 12px 0 0; font-size: 11.5px; color: var(--muted); line-height: 1.55; }
+.setinline { margin-top: 4px; }
+
+.rangerow { display: flex; align-items: center; gap: 12px; }
+.rangerow input[type=range] { flex: 1; accent-color: var(--brand); }
+.rangerow output {
+  min-width: 46px;
+  text-align: right;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.swatches { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.swatch {
+  width: 42px; height: 42px;
+  border-radius: 11px;
+  border: 2px solid var(--border);
+  cursor: pointer;
+  padding: 0;
+  position: relative;
+  transition: transform .3s var(--spring), border-color .25s var(--ease);
+}
+.swatch:hover { transform: translateY(-2px); border-color: var(--border-strong); }
+.swatch.on { border-color: var(--brand); }
+.swatch.on::after {
+  content: "✓";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .8);
+}
+
 /* ---------- hide products panel ---------- */
 .hidepanel {
   display: grid;

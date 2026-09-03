@@ -296,12 +296,10 @@ def in_section(deal, section):
 
 def list_deals(section="feed", min_discount=0, sort="score", limit=300,
                exclude_categories=(), exclude_keywords=()):
+    # Category and keyword exclusion is applied in Python below rather than
+    # here, so there is exactly one definition of "hidden" shared with alerts.
     where = ["gone=0", "hidden=0"]
     args = []
-    if exclude_categories:
-        marks = ",".join("?" * len(exclude_categories))
-        where.append(f"(category IS NULL OR category NOT IN ({marks}))")
-        args.extend(exclude_categories)
     if min_discount:
         where.append("discount_pct >= ?")
         args.append(min_discount)
@@ -318,16 +316,13 @@ def list_deals(section="feed", min_discount=0, sort="score", limit=300,
         f"SELECT * FROM deals WHERE {' AND '.join(where)} ORDER BY {order} LIMIT ?",
         args,
     ).fetchall()
-    deals = [d for d in (_to_dict(r) for r in rows) if in_section(d, section)]
-    if exclude_keywords:
-        # Free-text exclusions are matched in Python so users can type a plain
-        # comma-separated list without it becoming a pile of SQL LIKEs.
-        words = [w.strip().lower() for w in exclude_keywords if w.strip()]
-        deals = [
-            d for d in deals
-            if not any(w in f"{d['title']} {d['retailer']}".lower() for w in words)
-        ]
-    return deals
+    # Visibility runs through the same helper the alert path uses, so the two
+    # can never disagree about whether a deal is hidden.
+    return [
+        d for d in (_to_dict(r) for r in rows)
+        if in_section(d, section)
+        and not filters.suppressed(d, exclude_categories, exclude_keywords)
+    ]
 
 
 def hide_deal(deal_id):
