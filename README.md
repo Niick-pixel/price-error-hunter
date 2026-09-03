@@ -26,6 +26,17 @@ If you grant notification permission, alerts also appear as desktop
 notifications that open the deal when clicked, so they still reach you while the
 tab is in the background.
 
+### Chime at — sound without the interruption
+
+**Chime at** in the toolbar is a second, quieter trigger: pick a discount
+(50–90%) and any *new* deal at or above it plays the chime and nothing else. No
+card, no desktop notification, nothing to dismiss — just a cue to glance at the
+feed.
+
+The two triggers do not double up. A deal that already raised the visual alert
+is excluded from the chime pass, so it never sounds twice for the same find.
+Both respect the **Sound alert** checkbox, and neither fires on first load.
+
 ## Where deals come from
 
 Three public feeds are polled, each costing one request per cycle. A failing feed

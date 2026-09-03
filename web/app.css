@@ -1,8 +1,8 @@
 :root {
   /* Charcoal rather than pitch black: less eye strain and it gives the
      translucent panels something to sit on. */
-  --bg: #16181d;
-  --bg-raised: #1e2128;
+  --bg: #202430;
+  --bg-raised: #2a2f3d;
   --panel: rgba(255, 255, 255, .05);
   --panel-2: rgba(255, 255, 255, .085);
   --border: rgba(255, 255, 255, .11);
@@ -75,7 +75,7 @@ body {
   align-items: center;
   gap: 20px;
   padding: 16px 32px;
-  background: rgba(0, 0, 0, .72);
+  background: rgba(24, 27, 36, .82);
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
@@ -164,7 +164,7 @@ a.linkbtn { text-decoration: none; display: inline-flex; align-items: center; }
   gap: 4px;
   padding: 0 26px;
   border-bottom: 1px solid var(--border);
-  background: rgba(13, 17, 23, .6);
+  background: rgba(24, 27, 36, .55);
 }
 
 .tab {
@@ -531,10 +531,12 @@ body.modal-open { overflow: hidden; }
 }
 .card .thumb.hasimg { background: #fff; }
 
+/* Hidden while an image is still loading, so cards do not flash a placeholder
+   letter before the photo arrives. Shown only when there is no usable image. */
 .thumbfallback {
   position: absolute;
   inset: 0;
-  display: flex;
+  display: none;
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -542,7 +544,7 @@ body.modal-open { overflow: hidden; }
   color: var(--muted);
   pointer-events: none;
 }
-.thumb.hasimg .thumbfallback { display: none; }
+.thumb.noimg .thumbfallback { display: flex; }
 
 .fbinitial {
   font-size: 34px;

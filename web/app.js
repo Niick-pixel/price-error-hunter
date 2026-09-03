@@ -6,6 +6,7 @@ let settings = {};
 let firstLoad = true;
 let view = "feed";
 let lastAlertId = null;
+let lastSoundPing = null;
 
 const api = async (path, options = {}) => {
   const res = await fetch(path, {
@@ -63,16 +64,21 @@ function buildCard(deal) {
   thumb.append(fallback);
 
   const img = safeUrl(deal.image);
-  if (img) {
+  if (!img) {
+    thumb.classList.add("noimg");
+  } else {
     const image = new Image();
     image.src = img;
     image.alt = deal.title || "";
     image.loading = "lazy";
+    // The fallback stays hidden while loading, so a card never pops from a
+    // placeholder letter to the photo. It appears only on a real failure.
     const drop = () => {
       image.remove();
       thumb.classList.remove("hasimg");
+      thumb.classList.add("noimg");
     };
-    // Some retailers block hotlinking; show the fallback rather than a broken icon.
+    // Some retailers block hotlinking; show the fallback, not a broken icon.
     image.onerror = drop;
     // Amazon's by-ASIN path answers with a 43-byte 1px placeholder for most
     // non-book ASINs. It "loads" fine, so size is the only way to spot it.
@@ -479,6 +485,22 @@ function applyStatus(status) {
   }
 
   renderAlert(status.top_new);
+  soundOnlyPing(status);
+}
+
+/* Discount-threshold hits are audible only. The poller just increments a
+   counter, so a change means "new qualifying deals arrived" - nothing is shown
+   and nothing needs dismissing. */
+function soundOnlyPing(status) {
+  const ping = status.sound_ping || 0;
+  if (lastSoundPing === null) {
+    lastSoundPing = ping;          // first load: adopt, never chime
+    return;
+  }
+  if (ping !== lastSoundPing) {
+    lastSoundPing = ping;
+    if (settings.sound_alerts) chime();
+  }
 }
 
 /* The alert used to be an unlabelled bar that only marked things read, which is
@@ -613,6 +635,7 @@ function applySettings(cfg) {
     $("livecheck").checked = !!cfg.amazon_live_check;
     $("interval").value = String(cfg.poll_interval);
     $("keywords").value = cfg.exclude_keywords || "";
+    $("sounddiscount").value = String(cfg.sound_discount || 0);
     firstLoad = false;
   }
 }
@@ -703,6 +726,7 @@ function saveSettings() {
     sound_alerts: $("sound").checked,
     amazon_live_check: $("livecheck").checked,
     poll_interval: Number($("interval").value),
+    sound_discount: Number($("sounddiscount").value),
     excluded_categories: selectedCategories(),
     exclude_keywords: $("keywords").value,
   };
@@ -732,7 +756,7 @@ $("keywords").addEventListener("input", () => {
     load();
   })
 );
-["sound", "interval", "livecheck"].forEach((id) =>
+["sound", "interval", "livecheck", "sounddiscount"].forEach((id) =>
   $(id).addEventListener("change", saveSettings)
 );
 

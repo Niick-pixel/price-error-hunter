@@ -29,6 +29,10 @@ class Poller:
             "running": False,
             "amazon_error": None,
             "source_errors": None,
+            # Increments when discount-threshold deals arrive; the UI chimes on
+            # a change and shows nothing.
+            "sound_ping": 0,
+            "sound_ping_count": 0,
         }
         self._backoff = 0.0
 
@@ -221,12 +225,16 @@ class Poller:
         if not fresh_ids or not alert:
             return
         cfg = config.load()
+        fresh = [d for d in (store.get(i) for i in fresh_ids) if d]
         best = None
-        for deal_id in fresh_ids:
-            deal = store.get(deal_id)
-            if deal and (best is None or deal["score"] > best["score"]):
+        for deal in fresh:
+            if best is None or deal["score"] > best["score"]:
                 best = deal
         self.status["new_since_open"] += len(fresh_ids)
+
+        banner_id = best["id"] if best and best["score"] >= cfg["alert_score"] else None
+        self._note_sound_only(cfg, fresh, banner_id)
+
         if best and best["score"] >= cfg["alert_score"]:
             self.status["top_new"] = {
                 "title": best["title"],
@@ -240,3 +248,21 @@ class Poller:
                 "discount_pct": best.get("discount_pct"),
                 "image": best.get("image") or "",
             }
+
+    def _note_sound_only(self, cfg, fresh, banner_id):
+        """Chime, with no banner, for new deals above the discount threshold.
+
+        Deliberately carries no title or link: the UI only needs to know that
+        the counter moved so it can play the sound once per batch. The deal that
+        already raised the visual alert is skipped so it cannot chime twice.
+        """
+        threshold = cfg.get("sound_discount") or 0
+        if not threshold:
+            return
+        hits = [
+            d for d in fresh
+            if d["id"] != banner_id and (d.get("discount_pct") or 0) >= threshold
+        ]
+        if hits:
+            self.status["sound_ping"] += 1
+            self.status["sound_ping_count"] = len(hits)
