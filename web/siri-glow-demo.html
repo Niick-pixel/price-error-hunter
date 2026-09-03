@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SiriGlow — tuning bench</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: #08090c; color: #eceff5;
+    font: 13px/1.5 -apple-system, "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    display: grid; place-items: center; padding: 40px 20px;
+  }
+  .stage { text-align: center; max-width: 560px; }
+  h1 { font-size: 26px; font-weight: 600; letter-spacing: -.02em; margin: 0 0 8px; }
+  .lede { color: #9aa3b2; margin: 0 0 26px; }
+
+  .states { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  button {
+    background: #1a1d25; color: #eceff5; border: 1px solid #2c313c;
+    border-radius: 999px; padding: 9px 18px; font: inherit; cursor: pointer;
+    transition: background .2s, border-color .2s, transform .2s;
+  }
+  button:hover { background: #262b36; border-color: #3d4453; }
+  button:active { transform: scale(.96); }
+  button.on { background: #3b2a4d; border-color: #7b5cff; color: #d9ccff; }
+
+  /* Fixed panel so it stays put while the glow breathes behind it. */
+  .panel {
+    position: fixed; top: 16px; right: 16px; width: 288px; z-index: 2147483600;
+    background: rgba(16, 18, 24, .88); border: 1px solid #262b36;
+    border-radius: 14px; padding: 14px 16px;
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    max-height: calc(100vh - 32px); overflow-y: auto;
+  }
+  .panel h2 {
+    margin: 0 0 10px; font-size: 10.5px; letter-spacing: .1em;
+    text-transform: uppercase; color: #7d879a;
+  }
+  .row { margin-bottom: 11px; }
+  .row label {
+    display: flex; justify-content: space-between; gap: 10px;
+    font-size: 11.5px; color: #9aa3b2; margin-bottom: 4px;
+  }
+  .row output { color: #eceff5; font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; accent-color: #7b5cff; margin: 0; }
+  .hint { color: #6f7889; font-size: 10.5px; margin: 10px 0 0; line-height: 1.5; }
+  .badge {
+    display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 999px;
+    background: #1e2430; color: #8f9ab0; border: 1px solid #2c313c; margin-left: 6px;
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <h1>SiriGlow</h1>
+  <p class="lede">
+    Full-screen edge glow as a signed distance field — superellipse corners,
+    perimeter-sampled OKLCH palette, three drifting lobes, additive bloom.
+    Everything below is live.
+  </p>
+  <div class="states">
+    <button data-state="idle">idle</button>
+    <button data-state="enter">enter</button>
+    <button data-state="listening" class="on">listening</button>
+    <button data-state="thinking">thinking</button>
+    <button data-state="exit">exit</button>
+  </div>
+  <p class="hint" id="caps"></p>
+</div>
+
+<div class="panel">
+  <h2>Tuning</h2>
+
+  <div class="row">
+    <label>Fake amplitude <output id="o-amp">0.45</output></label>
+    <input type="range" id="amp" min="0" max="1" step="0.01" value="0.45">
+  </div>
+  <div class="row">
+    <label>lambda (px) <output id="o-lambda">60</output></label>
+    <input type="range" id="lambda" min="10" max="220" step="1" value="60">
+  </div>
+  <div class="row">
+    <label>Drift speed <output id="o-drift">1.00×</output></label>
+    <input type="range" id="drift" min="0" max="3" step="0.05" value="1">
+  </div>
+  <div class="row">
+    <label>Corner radius <output id="o-radius">55</output></label>
+    <input type="range" id="radius" min="0" max="180" step="1" value="55">
+  </div>
+  <div class="row">
+    <label>Corner p-norm <output id="o-pnorm">4.5</output></label>
+    <input type="range" id="pnorm" min="2" max="10" step="0.1" value="4.5">
+  </div>
+
+  <h2 style="margin-top:16px">Bloom weights</h2>
+  <div class="row">
+    <label>wide · σ50 <output id="o-b0">0.40</output></label>
+    <input type="range" id="b0" min="0" max="1.5" step="0.01" value="0.40">
+  </div>
+  <div class="row">
+    <label>mid · σ18 <output id="o-b1">0.70</output></label>
+    <input type="range" id="b1" min="0" max="1.5" step="0.01" value="0.70">
+  </div>
+  <div class="row">
+    <label>tight · σ4 <output id="o-b2">1.00</output></label>
+    <input type="range" id="b2" min="0" max="1.5" step="0.01" value="1.00">
+  </div>
+
+  <h2 style="margin-top:16px">Detail</h2>
+  <div class="row">
+    <label>Specular hairline <output id="o-hair">0.90</output></label>
+    <input type="range" id="hair" min="0" max="2" step="0.01" value="0.90">
+  </div>
+  <div class="row">
+    <label>Noise dither <output id="o-noise">0.020</output></label>
+    <input type="range" id="noise" min="0" max="0.08" step="0.001" value="0.02">
+  </div>
+  <div class="row">
+    <label>Lobe width <output id="o-lw">0.10</output></label>
+    <input type="range" id="lw" min="0.02" max="0.35" step="0.005" value="0.10">
+  </div>
+  <div class="row">
+    <label>Lobe gain <output id="o-lg">0.55</output></label>
+    <input type="range" id="lg" min="0" max="2" step="0.01" value="0.55">
+  </div>
+
+  <div class="row" style="margin-top:14px">
+    <button id="mic" style="width:100%">Drive from microphone</button>
+  </div>
+  <p class="hint">
+    The mic is opt-in and only starts when you press that button. Everything
+    else runs on the fake amplitude slider.
+  </p>
+</div>
+
+<script src="siri-glow.js"></script>
+<script>
+(function () {
+  var glow = new SiriGlow();
+  glow.state = "listening";
+  glow.amplitude = 0.45;
+
+  var caps = [];
+  caps.push(glow.gl ? "WebGL" : "CSS fallback");
+  if (glow.p3) caps.push("Display P3");
+  if (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    caps.push("reduced motion — drift frozen");
+  }
+  document.getElementById("caps").innerHTML =
+    caps.map(function (c) { return '<span class="badge">' + c + "</span>"; }).join("");
+
+  // state buttons
+  var buttons = [].slice.call(document.querySelectorAll("[data-state]"));
+  buttons.forEach(function (b) {
+    b.addEventListener("click", function () {
+      buttons.forEach(function (x) { x.classList.toggle("on", x === b); });
+      glow.state = b.dataset.state;
+    });
+  });
+
+  function bind(id, fmt, apply) {
+    var input = document.getElementById(id);
+    var out = document.getElementById("o-" + id);
+    function run() {
+      var v = parseFloat(input.value);
+      out.textContent = fmt(v);
+      apply(v);
+    }
+    input.addEventListener("input", run);
+    run();
+  }
+
+  var f2 = function (v) { return v.toFixed(2); };
+  var f0 = function (v) { return String(Math.round(v)); };
+
+  bind("amp", f2, function (v) { glow.amplitude = v; });
+  bind("lambda", f0, function (v) { glow.set("lambda", v); });
+  bind("drift", function (v) { return v.toFixed(2) + "×"; }, function (v) {
+    // Scale the base periods; larger period = slower lap.
+    var base = [11, -17, 23];
+    glow.set("driftPeriods", base.map(function (p) {
+      return v < 0.02 ? 1e9 : p / v;
+    }));
+  });
+  bind("radius", f0, function (v) { glow.set("radius", v); });
+  bind("pnorm", function (v) { return v.toFixed(1); }, function (v) {
+    glow.set("pnorm", v);
+  });
+
+  function bloom() {
+    glow.set("bloomWeights", [
+      parseFloat(document.getElementById("b0").value),
+      parseFloat(document.getElementById("b1").value),
+      parseFloat(document.getElementById("b2").value)
+    ]);
+  }
+  bind("b0", f2, bloom);
+  bind("b1", f2, bloom);
+  bind("b2", f2, bloom);
+
+  bind("hair", f2, function (v) { glow.set("hairline", v); });
+  bind("noise", function (v) { return v.toFixed(3); }, function (v) {
+    glow.set("noise", v);
+  });
+  bind("lw", function (v) { return v.toFixed(3); }, function (v) {
+    glow.set("lobeWidth", v);
+  });
+  bind("lg", f2, function (v) { glow.set("lobeGain", v); });
+
+  var micBtn = document.getElementById("mic");
+  var live = false;
+  micBtn.addEventListener("click", function () {
+    if (live) {
+      glow.stopMic();
+      live = false;
+      micBtn.textContent = "Drive from microphone";
+      micBtn.classList.remove("on");
+      glow.amplitude = parseFloat(document.getElementById("amp").value);
+      return;
+    }
+    micBtn.disabled = true;
+    glow.listenToMic().then(function () {
+      live = true;
+      micBtn.disabled = false;
+      micBtn.textContent = "Stop microphone";
+      micBtn.classList.add("on");
+      glow.state = "listening";
+    }).catch(function (err) {
+      micBtn.disabled = false;
+      micBtn.textContent = "Microphone unavailable";
+      console.warn(err);
+    });
+  });
+
+  window.glow = glow;   // handy for poking at from the console
+})();
+</script>
+</body>
+</html>
