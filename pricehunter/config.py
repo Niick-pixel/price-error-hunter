@@ -29,6 +29,7 @@ DEFAULTS = {
     # Sound-only threshold: chime for any new deal at or above this discount,
     # without showing a notification. 0 disables it.
     "sound_discount": 0,
+    "screen_glow": True,
     # Live Amazon lookups. Off by default: Amazon serves a CAPTCHA within a
     # couple of automated requests, so this is best-effort only.
     # Extra deal feeds, polled alongside the main listing.

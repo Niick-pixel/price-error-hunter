@@ -39,6 +39,29 @@ Shadows paint outside the border box and escape that clip. Under
 `prefers-reduced-motion` the breathing stops and a steady halo remains. The
 threshold is `GLOW_DISCOUNT` at the top of `web/app.js`.
 
+### Screen glow
+
+**Screen glow** in the toolbar lights the edges of the whole window when
+something lands — a full-screen signed-distance-field glow, superellipse
+corners, colour sampled around the perimeter in OKLCH (`web/siri-glow.js`).
+
+It fires on three moments only, never on the routine background poll, which
+would make it wallpaper:
+
+| Trigger | Behaviour |
+|---|---|
+| Price-error alert | 5s, brightness scaled by the deal's score |
+| Chime-at discount hit | 2.2s, dim — these raise no card, so it is a nudge |
+| **Refresh now** pressed | pulses until that cycle finishes |
+
+It sits above the alert card but below the detail modal, so opening a deal is
+never washed out, and it is `pointer-events: none` throughout. Turning the
+checkbox off stops it and skips creating the WebGL context at all.
+
+`web/siri-glow-demo.html` is a tuning bench for it — sliders for lambda, drift,
+bloom weights, corner shape, hairline, noise and a fake amplitude, plus an
+opt-in microphone input. Open it at `/static/siri-glow-demo.html`.
+
 ### Chime at — sound without the interruption
 
 **Chime at** in the toolbar is a second, quieter trigger: pick a discount

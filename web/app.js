@@ -29,6 +29,43 @@ const SOURCE_LABEL = {
 /* Discount at which a card gets the animated glow border. */
 const GLOW_DISCOUNT = 50;
 
+/* ---------- screen edge glow ----------
+   Deliberately not tied to the background poll: that runs every couple of
+   minutes and a full-screen glow on every cycle would be wallpaper. It fires
+   on the three moments that actually mean something - a price-error alert, a
+   sound-only discount hit, and a refresh the user asked for. */
+let screenGlow = null;
+let glowTimer = null;
+
+function initScreenGlow() {
+  if (screenGlow || !window.SiriGlow) return;
+  try {
+    // Above the alert card (60), below the detail modal (80), so opening a
+    // deal is never washed out by it.
+    screenGlow = new SiriGlow({ zIndex: 75, lambda: 54, hairline: 0.7 });
+  } catch (err) {
+    screenGlow = null;   // never let an effect break the app
+  }
+}
+
+function glowPulse(amplitude, holdMs) {
+  if (!screenGlow || !settings.screen_glow) return;
+  clearTimeout(glowTimer);
+  screenGlow.amplitude = amplitude;
+  screenGlow.state = "listening";
+  glowTimer = setTimeout(() => {
+    screenGlow.state = "exit";
+    glowTimer = setTimeout(() => {
+      if (screenGlow.state === "exit") screenGlow.state = "idle";
+    }, 400);
+  }, holdMs);
+}
+
+function glowStop() {
+  clearTimeout(glowTimer);
+  if (screenGlow) screenGlow.state = "idle";
+}
+
 const TIER_LABEL = { error: "LIKELY PRICE ERROR", strong: "STRONG DEAL", normal: "DEAL" };
 const TIER_COLOR = { error: "#ff4d5e", strong: "#f5a524", normal: "#3b4a5c" };
 
@@ -456,6 +493,15 @@ function applyStatus(status) {
   const pulse = $("pulse");
   pulse.className = "pulse" + (status.last_error ? " bad" : status.running ? " busy" : "");
 
+  // A manual refresh leaves the glow in "thinking"; retire it once the cycle
+  // finishes, unless an alert has since taken it over.
+  if (screenGlow && screenGlow.state === "thinking" && !status.running) {
+    screenGlow.state = "exit";
+    glowTimer = setTimeout(() => {
+      if (screenGlow.state === "exit") screenGlow.state = "idle";
+    }, 400);
+  }
+
   const secs = status.seconds_to_next;
   $("nextrun").textContent =
     status.running ? "checking…" : secs === null || secs === undefined ? "—" : `next in ${fmt(secs)}`;
@@ -505,6 +551,9 @@ function soundOnlyPing(status) {
   if (ping !== lastSoundPing) {
     lastSoundPing = ping;
     if (settings.sound_alerts) chime();
+    // These raise no card on purpose, so keep the glow brief and dim - it is
+    // a cue to glance at the feed, not something to dismiss.
+    glowPulse(0.4, 2200);
   }
 }
 
@@ -523,6 +572,8 @@ function renderAlert(top) {
     lastAlertId = top.id;
     if (settings.sound_alerts) chime();
     notifyDesktop(top);
+    // Brightness tracks how strong the find is.
+    glowPulse(0.55 + 0.45 * Math.min(1, (top.score || 0) / 100), 5000);
   }
 
   alert.classList.remove("hidden");
@@ -641,8 +692,11 @@ function applySettings(cfg) {
     $("interval").value = String(cfg.poll_interval);
     $("keywords").value = cfg.exclude_keywords || "";
     $("sounddiscount").value = String(cfg.sound_discount || 0);
+    $("screenglow").checked = cfg.screen_glow !== false;
     firstLoad = false;
   }
+  // Created lazily so the WebGL context only exists when it is wanted.
+  if (cfg.screen_glow !== false) initScreenGlow();
 }
 
 function renderCategories(list, excluded) {
@@ -732,6 +786,7 @@ function saveSettings() {
     amazon_live_check: $("livecheck").checked,
     poll_interval: Number($("interval").value),
     sound_discount: Number($("sounddiscount").value),
+    screen_glow: $("screenglow").checked,
     excluded_categories: selectedCategories(),
     exclude_keywords: $("keywords").value,
   };
@@ -765,9 +820,25 @@ $("keywords").addEventListener("input", () => {
   $(id).addEventListener("change", saveSettings)
 );
 
+$("screenglow").addEventListener("change", () => {
+  saveSettings();
+  settings.screen_glow = $("screenglow").checked;
+  if (settings.screen_glow) {
+    initScreenGlow();
+    glowPulse(0.7, 1600);        // confirm the toggle did something
+  } else {
+    glowStop();
+  }
+});
+
 $("refresh").addEventListener("click", async () => {
   const btn = $("refresh");
   btn.disabled = true;
+  // A refresh the user asked for is worth showing; background polls are not.
+  if (screenGlow && settings.screen_glow) {
+    clearTimeout(glowTimer);
+    screenGlow.state = "thinking";
+  }
   try {
     const res = await api("/api/refresh", { method: "POST" });
     if (!res.ok) $("laststate").textContent = `too soon — wait ${Math.ceil(res.wait)}s`;

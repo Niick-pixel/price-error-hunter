@@ -75,6 +75,10 @@
       <input type="checkbox" id="sound">
       <span>Sound alert</span>
     </label>
+    <label class="toggle">
+      <input type="checkbox" id="screenglow">
+      <span title="Edge glow around the screen when something lands">Screen glow</span>
+    </label>
     <label class="field">
       <span title="Plays a chime only — no notification card">Chime at</span>
       <select id="sounddiscount">
@@ -125,6 +129,7 @@
 <main id="grid" class="grid"></main>
 <p id="empty" class="empty">Loading the deal feed…</p>
 
+<script src="/static/siri-glow.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>
