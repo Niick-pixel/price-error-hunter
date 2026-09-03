@@ -28,15 +28,16 @@ tab is in the background.
 
 ### The glow
 
-Any deal at **50% off or more** gets an animated gradient border — a slowly
-rotating conic sweep with a soft bloom underneath, so the strongest finds are
-obvious while scrolling without needing a card or a badge.
+Any deal at **50% off or more** is backlit: a warm halo spills out behind the
+card and breathes slowly, so the strongest finds are obvious while scrolling
+without needing another badge. It is a light behind the card, not an outline —
+the border itself stays ordinary, just faintly warmed.
 
-The rotation works by animating a registered custom property (`@property
---glow-angle`); CSS cannot interpolate a bare angle inside a gradient otherwise.
-Browsers without `@property` fall back to a static lit edge, and the whole effect
-reduces to a plain halo under `prefers-reduced-motion`. The threshold is
-`GLOW_DISCOUNT` at the top of `web/app.js`.
+It has to be a `box-shadow` rather than a blurred pseudo-element, because
+`.card` sets `overflow: hidden` for the image zoom and would clip a child.
+Shadows paint outside the border box and escape that clip. Under
+`prefers-reduced-motion` the breathing stops and a steady halo remains. The
+threshold is `GLOW_DISCOUNT` at the top of `web/app.js`.
 
 ### Chime at — sound without the interruption
 
