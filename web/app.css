@@ -563,8 +563,16 @@ body.modal-open { overflow: hidden; }
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 22px;
   padding: 30px 32px 72px;
-  align-items: start;
+  /* stretch, not start: every card in a row is the height of the tallest, so
+     the quicklinks line up instead of stepping. */
+  align-items: stretch;
 }
+
+/* Equal heights: the card fills its stretched grid cell and the body grows,
+   so the meta row and quicklink sit at the bottom of every card in a row. */
+.card { display: flex; flex-direction: column; }
+.card .body { flex: 1; display: flex; flex-direction: column; }
+.card .meta { margin-top: auto; }
 
 .empty { text-align: center; color: var(--muted); padding: 70px 30px; font-size: 15px; }
 
@@ -642,6 +650,13 @@ body.modal-open { overflow: hidden; }
    negative-z child would paint over the card's own background rather than
    behind it. A box-shadow paints strictly outside the border box, so it reads
    as light behind the card with no clipping workaround and no stray edge. */
+/* Four offset colour shadows, one per corner, drifting round the card so the
+   hues trade places.
+
+   A gradient layer behind the card was tried and reverted: .card's background
+   is only 5% white, so a bright layer underneath shows straight through the
+   body and the colour reads as being in front of the content. A box-shadow
+   paints strictly outside the border box, which is the whole point. */
 .card.glow {
   border-color: rgba(255, 255, 255, .18);
   animation: cardAurora 9s linear infinite;
@@ -674,7 +689,7 @@ body.modal-open { overflow: hidden; }
   }
 }
 
-/* Hover keeps the drift but adds the depth shadow underneath. */
+/* Hover adds the depth shadow underneath the same four hues. */
 .card.glow:hover {
   box-shadow: 0 22px 50px rgba(0, 0, 0, .55),
               -22px -16px 46px -4px rgba(255,  45, 149, .70),
@@ -862,6 +877,29 @@ body.modal-open { overflow: hidden; }
 }
 .chartwrap img { display: block; width: 100%; height: auto; }
 .chartcap { font-size: 11px; color: var(--muted); margin: 0 0 10px; }
+
+/* Quicklink: straight to the retailer without opening details first. */
+.quicklink {
+  display: block;
+  margin-top: 12px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--brand), #ff5f2e);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+  letter-spacing: -.01em;
+  transition: transform .3s var(--spring), filter .25s var(--ease),
+              box-shadow .3s var(--ease);
+}
+.quicklink:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px -6px rgba(255, 122, 24, .7);
+}
+.quicklink:active { transform: scale(.97); }
 
 .actions { display: flex; gap: 10px; flex-wrap: wrap; }
 

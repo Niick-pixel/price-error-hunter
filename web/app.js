@@ -120,7 +120,7 @@ function stat(label, value, mod) {
 function buildCard(deal) {
   const card = el("article", "card");
   card.dataset.id = deal.id;
-  // Anything at or above this discount gets the animated edge glow.
+  // Anything at or above this discount gets the aurora backlight.
   if (settings.card_glow !== false && (deal.discount_pct || 0) >= GLOW_DISCOUNT) {
     card.classList.add("glow");
   }
@@ -178,6 +178,19 @@ function buildCard(deal) {
   meta.append(el("span", null, deal.age_text || ""));
   meta.append(el("span", null, deal.savings ? `save ${money(deal.savings)}` : ""));
   body.append(meta);
+
+  // Straight to the product, without opening the details first. Sits at the
+  // bottom of every card so the row of buttons lines up across the grid.
+  const target = safeUrl(deal.direct_url) || safeUrl(deal.out_url) || safeUrl(deal.url);
+  if (target) {
+    const quick = el("a", "quicklink", `Open on ${hostLabel(target)} →`);
+    quick.href = target;
+    quick.target = "_blank";
+    quick.rel = "noopener noreferrer";
+    // Stop the click bubbling into the card's open-details handler.
+    quick.addEventListener("click", (event) => event.stopPropagation());
+    body.append(quick);
+  }
 
   card.append(body);
 
@@ -975,6 +988,29 @@ if ("Notification" in window && Notification.permission === "default") {
   }, { once: true });
 }
 
+/* Status is ~1.3KB and answers in 3ms; the full deal list is ~144KB and 29ms.
+   Polling the cheap one often and pulling deals only when a cycle actually
+   finished cuts an alert's on-screen delay from up to 20s down to a few
+   seconds, while sending far less data than the old blanket refresh. */
+let lastCycles = null;
+
+async function pollStatus() {
+  try {
+    const status = await api("/api/status");
+    applyStatus(status);
+    if (status.cycles !== lastCycles) {
+      const firstSample = lastCycles === null;
+      lastCycles = status.cycles;
+      // The initial load() already fetched deals; only later changes need one.
+      if (!firstSample) load();
+    }
+  } catch {
+    $("pulse").className = "pulse bad";
+  }
+}
+
 load();
-setInterval(load, 20000);
+setInterval(pollStatus, 4000);
+// Safety net in case a change is ever missed; the status poll does the work.
+setInterval(load, 120000);
 setInterval(tick, 1000);

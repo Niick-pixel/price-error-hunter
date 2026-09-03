@@ -75,13 +75,16 @@ class Poller:
                 items, changed = self.scraper.fetch_listing()
                 if changed:
                     fresh += store.upsert_listing(items, source="hiddenclearances")
-                    self.status["unchanged_streak"] = 0
-                else:
-                    self.status["unchanged_streak"] += 1
 
             # Extra feeds run every cycle, independently of the main listing's
             # 304 handling, and one failing feed must not stop the others.
             fresh += self._fetch_sources(cfg)
+
+            # Quiet means quiet everywhere, not just on the main listing.
+            if fresh:
+                self.status["unchanged_streak"] = 0
+            else:
+                self.status["unchanged_streak"] += 1
 
             # Score from feed data first so the limited detail budget is spent on
             # the most promising deals, then score again once details are in.
@@ -110,10 +113,13 @@ class Poller:
             return self._backoff
 
         base = max(cfg["poll_interval"], cfg["min_interval"])
-        # Back off gently while nothing is changing, so a quiet feed isn't polled
-        # at the same rate as a busy one.
-        if self.status["unchanged_streak"] >= 3:
-            base *= min(1 + 0.25 * (self.status["unchanged_streak"] - 2), 3.0)
+        # Ease off only when every source has been quiet for a while. This used
+        # to key off Hidden Clearances' 304s alone and stretch to 3x, so with
+        # six feeds a chosen 2 minutes drifted out past 6 - the other five could
+        # be delivering deals while the streak kept climbing. The streak now
+        # resets on any new deal from any source, and the ceiling is 2x.
+        if self.status["unchanged_streak"] >= 5:
+            base *= min(1 + 0.2 * (self.status["unchanged_streak"] - 4), 2.0)
         return base * (1 + random.uniform(-cfg["jitter"], cfg["jitter"]))
 
     def _fetch_details(self, cfg):
