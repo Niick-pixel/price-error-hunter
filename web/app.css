@@ -559,6 +559,65 @@ body.modal-open { overflow: hidden; }
   text-transform: uppercase;
   color: rgba(255, 255, 255, .3);
 }
+/* ---------- big-discount glow ----------
+   Applied to any deal at or above GLOW_DISCOUNT (50%), so the strongest finds
+   stand out at a glance while scrolling.
+
+   The angle is animated through a registered custom property, which is what
+   lets a conic gradient rotate at all - CSS cannot interpolate a bare angle
+   inside a gradient otherwise. The gradient is painted into the border box and
+   the card's own fill covers the padding box, leaving a lit edge. */
+@property --glow-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.card.glow {
+  border: 2px solid transparent;
+  background-image:
+    linear-gradient(var(--bg-raised), var(--bg-raised)),
+    conic-gradient(from var(--glow-angle),
+      #ff7a18, #ff4d6d, #c026d3, #6366f1, #22d3ee, #34d399, #ffd60a, #ff7a18);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  animation: glowSpin 6s linear infinite, glowBreathe 3.2s var(--ease) infinite;
+}
+
+.card.glow:hover {
+  animation-duration: 2.6s, 3.2s;   /* spin quickens under the cursor */
+}
+
+@keyframes glowSpin {
+  to { --glow-angle: 360deg; }
+}
+
+/* A slow bloom underneath, so the edge reads as light rather than a stroke. */
+@keyframes glowBreathe {
+  0%, 100% {
+    box-shadow: 0 0 18px -6px rgba(192, 38, 211, .55),
+                0 0 34px -10px rgba(99, 102, 241, .45);
+  }
+  50% {
+    box-shadow: 0 0 30px -4px rgba(255, 122, 24, .6),
+                0 0 56px -8px rgba(34, 211, 238, .5);
+  }
+}
+
+/* Without @property the angle cannot animate, so show a static lit edge
+   rather than a border stuck on one colour. */
+@supports not (background: conic-gradient(from var(--glow-angle), red, blue)) {
+  .card.glow {
+    border-color: rgba(192, 38, 211, .65);
+    background-image: none;
+    animation: glowBreathe 3.2s var(--ease) infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card.glow { animation: none; box-shadow: 0 0 24px -6px rgba(192, 38, 211, .5); }
+}
+
 /* A slow zoom on hover, the way Apple treats product photography. */
 .card .thumb img { transition: transform .8s var(--ease-out); }
 .card:hover .thumb img { transform: scale(1.05); }

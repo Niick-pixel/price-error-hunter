@@ -26,6 +26,9 @@ const SOURCE_LABEL = {
   slickdeals: "Slickdeals",
 };
 
+/* Discount at which a card gets the animated glow border. */
+const GLOW_DISCOUNT = 50;
+
 const TIER_LABEL = { error: "LIKELY PRICE ERROR", strong: "STRONG DEAL", normal: "DEAL" };
 const TIER_COLOR = { error: "#ff4d5e", strong: "#f5a524", normal: "#3b4a5c" };
 
@@ -57,6 +60,8 @@ function stat(label, value, mod) {
 function buildCard(deal) {
   const card = el("article", "card");
   card.dataset.id = deal.id;
+  // Anything at or above this discount gets the animated edge glow.
+  if ((deal.discount_pct || 0) >= GLOW_DISCOUNT) card.classList.add("glow");
 
   // thumbnail
   const thumb = el("div", "thumb");

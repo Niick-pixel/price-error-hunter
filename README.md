@@ -26,6 +26,18 @@ If you grant notification permission, alerts also appear as desktop
 notifications that open the deal when clicked, so they still reach you while the
 tab is in the background.
 
+### The glow
+
+Any deal at **50% off or more** gets an animated gradient border — a slowly
+rotating conic sweep with a soft bloom underneath, so the strongest finds are
+obvious while scrolling without needing a card or a badge.
+
+The rotation works by animating a registered custom property (`@property
+--glow-angle`); CSS cannot interpolate a bare angle inside a gradient otherwise.
+Browsers without `@property` fall back to a static lit edge, and the whole effect
+reduces to a plain halo under `prefers-reduced-motion`. The threshold is
+`GLOW_DISCOUNT` at the top of `web/app.js`.
+
 ### Chime at — sound without the interruption
 
 **Chime at** in the toolbar is a second, quieter trigger: pick a discount
