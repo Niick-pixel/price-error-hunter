@@ -47,6 +47,9 @@ DEFAULTS = {
     # otherwise dominate the Amazon feeds.
     "excluded_categories": ["books"],
     "exclude_keywords": "",
+    # Comma-separated words to watch for. A new deal matching one of these
+    # raises its own alert with a distinct sound.
+    "watch_keywords": "",
     "amazon_live_check": False,
     "amazon_min_gap": 25,
     "amazon_hourly_cap": 12,

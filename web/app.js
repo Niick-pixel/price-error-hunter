@@ -8,6 +8,7 @@ let view = "feed";
 let dataSection = "feed";
 let lastAlertId = null;
 let lastSoundPing = null;
+let lastWatchPing = null;
 
 const api = async (path, options = {}) => {
   const res = await fetch(path, {
@@ -573,7 +574,8 @@ function applyStatus(status) {
       "history, so it is out of reach for most personal setups."));
   }
 
-  renderAlert(status.top_new);
+  // A keyword hit takes the card for itself; otherwise the score alert has it.
+  if (!watchAlert(status)) renderAlert(status.top_new);
   soundOnlyPing(status);
 }
 
@@ -598,7 +600,7 @@ function soundOnlyPing(status) {
 /* The alert used to be an unlabelled bar that only marked things read, which is
    why clicking it appeared to do nothing. It now opens the deal, and dismissing
    is a separate control so the two actions cannot be confused. */
-function renderAlert(top) {
+function renderAlert(top, keyword) {
   const alert = $("alert");
   if (!top) {
     alert.classList.add("hidden");
@@ -606,13 +608,15 @@ function renderAlert(top) {
     return;
   }
 
-  if (top.id !== lastAlertId) {
+  // A watch hit has already made its own sound and glow; do not repeat them.
+  if (!keyword && top.id !== lastAlertId) {
     lastAlertId = top.id;
     if (settings.sound_alerts) chime();
     notifyDesktop(top);
     // Brightness tracks how strong the find is.
     glowPulse(0.55 + 0.45 * Math.min(1, (top.score || 0) / 100), 5000);
   }
+  if (keyword) lastAlertId = top.id;
 
   alert.classList.remove("hidden");
   alert.replaceChildren();
@@ -627,7 +631,12 @@ function renderAlert(top) {
   }
 
   const body = el("div", "alertbody");
-  body.append(el("span", "alertkicker", `Possible price error · ${Math.round(top.score)}/100`));
+  const kicker = keyword
+    ? `Watching “${keyword}”`
+    : `Possible price error · ${Math.round(top.score)}/100`;
+  const kickerEl = el("span", "alertkicker", kicker);
+  if (keyword) kickerEl.classList.add("watch");
+  body.append(kickerEl);
   body.append(el("span", "alerttitle", top.title));
   const bits = [];
   if (top.retailer) bits.push(top.retailer);
@@ -659,20 +668,48 @@ async function dismissAlert() {
   load();
 }
 
-/* A soft two-note chime built with WebAudio, replacing the Windows
-   exclamation sound the app used to trigger through winsound. */
+/* Keyword watch. A word the user typed is the strongest signal in the app, so
+   it gets its own sound and its own card naming the match. */
+function watchAlert(status) {
+  const ping = status.watch_ping || 0;
+  if (lastWatchPing === null) {
+    lastWatchPing = ping;              // first sample: adopt, never fire
+    return false;
+  }
+  if (ping === lastWatchPing) return false;
+  lastWatchPing = ping;
+
+  const hit = status.watch_hit;
+  if (!hit) return false;
+  if (settings.sound_alerts) chime("watch");
+  notifyDesktop({ ...hit, title: `“${hit.keyword}” — ${hit.title}` });
+  renderAlert(hit, hit.keyword);
+  glowPulse(1, 6000);
+  return true;
+}
+
+/* Two WebAudio motifs, distinct enough to tell apart without looking:
+   a rising two-note chime for a price error, and a brighter three-note
+   arpeggio for a keyword you asked to watch. */
+const CHIMES = {
+  default: [{ f: 880.0, t: 0 }, { f: 1318.51, t: 0.13 }],
+  watch: [
+    { f: 1046.5, t: 0 },      // C6
+    { f: 1318.5, t: 0.10 },   // E6
+    { f: 1568.0, t: 0.20 },   // G6
+    { f: 2093.0, t: 0.32 },   // C7, the tell
+  ],
+};
+
 let audioCtx = null;
-function chime() {
+function chime(kind) {
   try {
     const Ctx = window.AudioContext || window.webkitAudioContext;
     if (!Ctx) return;
     audioCtx = audioCtx || new Ctx();
     if (audioCtx.state === "suspended") audioCtx.resume();
     const now = audioCtx.currentTime;
-    [
-      { f: 880.0, t: 0 },      // A5
-      { f: 1318.51, t: 0.13 }, // E6
-    ].forEach(({ f, t }) => {
+    (CHIMES[kind] || CHIMES.default).forEach(({ f, t }) => {
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
       osc.type = "sine";
@@ -734,6 +771,7 @@ function applySettings(cfg) {
     $("cardglow").value = String(cfg.card_glow_discount ?? 50);
     $("o-cardglow").textContent = `${cfg.card_glow_discount ?? 50}%`;
     $("cardglowon").checked = cfg.card_glow !== false;
+    $("watchwords").value = cfg.watch_keywords || "";
     $("alertscore").value = String(cfg.alert_score ?? 75);
     $("o-alertscore").textContent = String(cfg.alert_score ?? 75);
     GLOW_DISCOUNT = cfg.card_glow_discount ?? 50;
@@ -923,6 +961,7 @@ function saveSettings() {
     screen_glow: $("screenglow").checked,
     excluded_categories: selectedCategories(),
     exclude_keywords: $("keywords").value,
+    watch_keywords: $("watchwords").value,
     bg_theme: document.querySelector(".swatch.on")?.dataset.theme || "charcoal",
     card_glow: $("cardglowon").checked,
     card_glow_discount: Number($("cardglow").value),
@@ -931,6 +970,13 @@ function saveSettings() {
   };
   api("/api/settings", { method: "POST", body: JSON.stringify(payload) }).catch(() => {});
 }
+
+// Watch words only affect future alerts, so a debounced save is enough.
+let watchTimer = null;
+$("watchwords").addEventListener("input", () => {
+  clearTimeout(watchTimer);
+  watchTimer = setTimeout(saveSettings, 450);
+});
 
 let kwTimer = null;
 $("keywords").addEventListener("input", () => {

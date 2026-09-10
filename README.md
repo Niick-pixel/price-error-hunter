@@ -1,14 +1,30 @@
 # Price Error Hunter
 
-A Windows desktop tool that watches the [Hidden Clearances online feed](https://www.hiddenclearances.com/deals/online)
-and surfaces the deals that look like genuine **pricing mistakes** rather than ordinary sales.
+A desktop tool for **Windows and macOS** that watches several public deal feeds
+and surfaces the ones that look like genuine **pricing mistakes** rather than
+ordinary sales.
 
 ## Running it
 
-Double-click **`run.bat`**. The first launch builds a local Python environment and
-installs two packages; after that it starts in a second or two and opens your browser.
+| Platform | Launcher |
+|---|---|
+| Windows | double-click **`run.bat`** |
+| macOS / Linux | double-click **`run.command`**, or `./run.command` in a terminal |
 
-Close the console window to stop it.
+Either one builds a local Python environment on first launch and installs two
+packages; after that it starts in a second or two and opens your browser. Close
+the console window to stop it.
+
+Everything runs locally — the UI is a small page served on `127.0.0.1`, so
+there is nothing platform-specific about the app itself, only the launcher.
+Python 3.9+ is required; macOS ships `python3`, and the launcher says how to
+install it if it is missing.
+
+If macOS refuses to open `run.command`, it has lost its executable bit:
+
+```bash
+chmod +x run.command
+```
 
 ## Alerts
 
@@ -64,6 +80,21 @@ checkbox off stops it and skips creating the WebGL context at all.
 `web/siri-glow-demo.html` is a tuning bench for it — sliders for lambda, drift,
 bloom weights, corner shape, hairline, noise and a fake amplitude, plus an
 opt-in microphone input. Open it at `/static/siri-glow-demo.html`.
+
+### Keyword alerts
+
+**Settings → Watch keywords** takes a comma-separated list. When a new deal's
+title or retailer matches one, it raises a card naming the word that matched and
+plays a **different sound** — a four-note arpeggio against the two-note chime
+everything else uses, so you can tell them apart without looking.
+
+A word you typed yourself is the strongest signal in the app, so a watch hit
+outranks the score threshold: it fires even for a deal scoring well below
+**Notify at score**, and it claims that deal so one find never makes two sounds.
+
+Hidden product types still win. Watching `airpods` will not resurface something
+excluded by category or by the hide list — the same `filters.suppressed` gate
+applies first.
 
 ### Chime at — sound without the interruption
 

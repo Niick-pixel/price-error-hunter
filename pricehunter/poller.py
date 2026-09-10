@@ -33,6 +33,10 @@ class Poller:
             # a change and shows nothing.
             "sound_ping": 0,
             "sound_ping_count": 0,
+            # Keyword watch: its own counter and payload so the UI can play a
+            # distinct sound and name the word that matched.
+            "watch_ping": 0,
+            "watch_hit": None,
         }
         self._backoff = 0.0
 
@@ -248,8 +252,12 @@ class Poller:
         # Count what the user can actually see, not what was ingested.
         self.status["new_since_open"] += len(fresh)
 
+        # A word the user typed themselves outranks any score threshold, so the
+        # watch pass runs first and claims the deal it matched.
+        watch_id = self._note_watch(cfg, fresh)
+
         banner_id = best["id"] if best and best["score"] >= cfg["alert_score"] else None
-        self._note_sound_only(cfg, fresh, banner_id)
+        self._note_sound_only(cfg, fresh, banner_id, watch_id)
 
         if best and best["score"] >= cfg["alert_score"]:
             self.status["top_new"] = {
@@ -265,7 +273,36 @@ class Poller:
                 "image": best.get("image") or "",
             }
 
-    def _note_sound_only(self, cfg, fresh, banner_id):
+    def _note_watch(self, cfg, fresh):
+        """Raise a watch alert for a new deal matching a watched keyword.
+
+        Returns the matched deal's id so the discount chime does not also fire
+        for it - one find should make one sound.
+        """
+        keywords = filters.parse_keywords(cfg.get("watch_keywords"))
+        if not keywords:
+            return None
+        for deal in fresh:
+            word = filters.watch_match(deal, keywords)
+            if not word:
+                continue
+            self.status["watch_ping"] += 1
+            self.status["watch_hit"] = {
+                "id": deal["id"],
+                "keyword": word,
+                "title": deal["title"],
+                "score": deal.get("score"),
+                "url": (deal.get("direct_url") or deal.get("out_url")
+                        or deal.get("url")),
+                "retailer": deal.get("retailer") or "",
+                "price": deal.get("price"),
+                "discount_pct": deal.get("discount_pct"),
+                "image": deal.get("image") or "",
+            }
+            return deal["id"]
+        return None
+
+    def _note_sound_only(self, cfg, fresh, banner_id, watch_id=None):
         """Chime, with no banner, for new deals above the discount threshold.
 
         Deliberately carries no title or link: the UI only needs to know that
@@ -277,7 +314,8 @@ class Poller:
             return
         hits = [
             d for d in fresh
-            if d["id"] != banner_id and (d.get("discount_pct") or 0) >= threshold
+            if d["id"] not in (banner_id, watch_id)
+            and (d.get("discount_pct") or 0) >= threshold
         ]
         if hits:
             self.status["sound_ping"] += 1

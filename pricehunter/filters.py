@@ -163,6 +163,26 @@ def suppressed(deal, excluded_categories, keywords):
     return False
 
 
+def parse_keywords(raw):
+    """Split a comma-separated setting into clean lowercase terms."""
+    return [w.strip().lower() for w in (raw or "").split(",") if w.strip()]
+
+
+def watch_match(deal, keywords):
+    """Return the first watch keyword this deal matches, or ''.
+
+    Matched against the title and retailer, the same surface the exclude list
+    uses, so the two behave predictably against each other.
+    """
+    if not keywords:
+        return ""
+    haystack = f"{deal.get('title') or ''} {deal.get('retailer') or ''}".lower()
+    for word in keywords:
+        if word and word in haystack:
+            return word
+    return ""
+
+
 def settings_filter(cfg):
     """Pull the two exclusion settings out of config in one place."""
     return (
