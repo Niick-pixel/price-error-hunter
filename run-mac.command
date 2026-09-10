@@ -3,7 +3,7 @@
 #
 # The .command extension makes this double-clickable in Finder. If macOS
 # refuses to run it, the file has lost its executable bit - restore it with:
-#     chmod +x run.command
+#     chmod +x run-mac.command
 set -e
 
 # Finder launches scripts from the user's home directory, not the script's

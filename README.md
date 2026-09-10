@@ -8,8 +8,8 @@ ordinary sales.
 
 | Platform | Launcher |
 |---|---|
-| Windows | double-click **`run.bat`** |
-| macOS / Linux | double-click **`run.command`**, or `./run.command` in a terminal |
+| Windows | double-click **`run-windows.bat`** |
+| macOS / Linux | double-click **`run-mac.command`**, or `./run-mac.command` in a terminal |
 
 Either one builds a local Python environment on first launch and installs two
 packages; after that it starts in a second or two and opens your browser. Close
@@ -20,10 +20,13 @@ there is nothing platform-specific about the app itself, only the launcher.
 Python 3.9+ is required; macOS ships `python3`, and the launcher says how to
 install it if it is missing.
 
-If macOS refuses to open `run.command`, it has lost its executable bit:
+The `.command` extension is what makes Finder run the file on a double-click —
+a plain `.sh` would open in a text editor instead.
+
+If macOS refuses to open it, the file has lost its executable bit:
 
 ```bash
-chmod +x run.command
+chmod +x run-mac.command
 ```
 
 ## Alerts
