@@ -149,7 +149,12 @@
   </div>
 
   <div class="setcard">
-    <h3>Alerts</h3>
+    <h3>When to alert</h3>
+    <p class="setintro">
+      Two independent gates. A find has to be strong enough <em>and</em> recent
+      enough before anything makes a sound.
+    </p>
+
     <div class="setrow">
       <label class="setlabel" for="alertscore">
         Notify at score <span class="setnote">how strong a find must be to raise a card</span>
@@ -159,7 +164,8 @@
         <output id="o-alertscore">75</output>
       </div>
     </div>
-    <div class="setrow" style="margin-top:16px">
+
+    <div class="setrow">
       <label class="setlabel" for="alertage">
         Only alert on deals posted within
         <span class="setnote">a deal can be new to us but hours old — the popular feed surfaces items long after they go up</span>
@@ -176,8 +182,41 @@
     <p class="sethint">
       Hidden product types never raise an alert, whatever they score.
     </p>
+  </div>
 
-    <div class="setrow" style="margin-top:18px">
+  <div class="setcard">
+    <h3>Watching</h3>
+    <p class="setintro">
+      Things you have asked for by name. These outrank the score — a watched
+      find alerts even when it would not clear the threshold above.
+    </p>
+
+    <div class="setrow">
+      <label class="setlabel" for="watchwords">
+        Watch keywords
+        <span class="setnote">a match plays a different sound and names the word</span>
+      </label>
+      <input type="text" id="watchwords" class="kwinput"
+             placeholder="e.g. airpods, lego, dyson" autocomplete="off">
+    </div>
+
+    <div class="setrow">
+      <label class="setlabel" for="watchlist">
+        Pinned products
+        <span class="setnote">ASINs or product links, one per line — these always alert and sort to the top</span>
+      </label>
+      <textarea id="watchlist" class="kwinput kwarea" rows="4" spellcheck="false"
+                placeholder="B0CV6WWPG2&#10;https://www.amazon.com/dp/B08N5WRWNW"></textarea>
+    </div>
+    <p class="sethint">
+      Pinned items ignore the age and score gates entirely. Paste a full link and
+      the ASIN is pulled out of it.
+    </p>
+  </div>
+
+  <div class="setcard">
+    <h3>What to show</h3>
+    <div class="setrow">
       <label class="setlabel" for="dealttl">
         Hide deals older than
         <span class="setnote">measured from when the deal was posted — the same age shown on each card</span>
@@ -191,18 +230,49 @@
         <option value="168">1 week</option>
       </select>
     </div>
+  </div>
 
-    <div class="setrow" style="margin-top:18px">
-      <label class="setlabel" for="watchwords">
-        Watch keywords
-        <span class="setnote">a match plays a different sound and names the word</span>
+  <div class="setcard">
+    <h3>Send alerts elsewhere</h3>
+    <p class="setintro">
+      Optional. Off unless a destination is filled in, and only high-scoring or
+      watched finds are ever sent — never the whole feed.
+    </p>
+
+    <div class="setrow">
+      <label class="setlabel" for="discordhook">
+        Discord webhook URL
+        <span class="setnote">channel settings → integrations → webhooks</span>
       </label>
-      <input type="text" id="watchwords" class="kwinput"
-             placeholder="e.g. airpods, lego, dyson" autocomplete="off">
+      <input type="text" id="discordhook" class="kwinput" autocomplete="off"
+             placeholder="https://discord.com/api/webhooks/…">
+    </div>
+
+    <div class="setrow">
+      <label class="setlabel" for="tgtoken">
+        Telegram bot token
+        <span class="setnote">from @BotFather</span>
+      </label>
+      <input type="text" id="tgtoken" class="kwinput" autocomplete="off"
+             placeholder="123456:ABC-DEF…">
+    </div>
+
+    <div class="setrow">
+      <label class="setlabel" for="tgchat">
+        Telegram chat ID
+        <span class="setnote">message the bot once, then use @userinfobot to get your ID</span>
+      </label>
+      <input type="text" id="tgchat" class="kwinput" autocomplete="off"
+             placeholder="987654321">
+    </div>
+
+    <div class="setrow">
+      <button class="btn" id="testnotify" type="button">Send a test message</button>
+      <span id="testnotifyresult" class="sethint" style="margin-left:10px"></span>
     </div>
     <p class="sethint">
-      Comma separated, matched against title and retailer. Hidden product types
-      still win, so a watched word will not resurface something you have hidden.
+      Stored in <code>data/settings.json</code> on this machine and never sent
+      anywhere except the service you configured.
     </p>
   </div>
 

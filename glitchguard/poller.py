@@ -3,7 +3,8 @@ import threading
 import time
 import traceback
 
-from . import amazon, config, creators, filters, scoring, scraper, sources, store
+from . import (amazon, config, creators, filters, notify, scoring, scraper,
+               sources, store)
 
 
 class Poller:
@@ -37,6 +38,7 @@ class Poller:
             # distinct sound and name the word that matched.
             "watch_ping": 0,
             "watch_hit": None,
+            "notify_error": None,
         }
         self._backoff = 0.0
 
@@ -268,12 +270,24 @@ class Poller:
         def posted(deal):
             return deal.get("posted_at") or deal.get("first_seen") or 0
 
-        fresh = [
-            d for d in (store.get(i) for i in fresh_ids)
-            if d and not filters.suppressed(d, cats, words)
-            and (not oldest_listed or posted(d) >= oldest_listed)
-            and (not oldest_alertable or posted(d) >= oldest_alertable)
-        ]
+        # Pinned products skip both gates. The user named these specifically, so
+        # a pinned item alerting late or scoring low is still what they asked
+        # for; hiding it behind a freshness rule would defeat the point.
+        pinned = filters.parse_watchlist(cfg.get("watchlist"))
+
+        fresh = []
+        for deal in (store.get(i) for i in fresh_ids):
+            if not deal or filters.suppressed(deal, cats, words):
+                continue
+            if filters.watchlist_match(deal, pinned):
+                deal["_pinned"] = True
+                fresh.append(deal)
+                continue
+            if oldest_listed and posted(deal) < oldest_listed:
+                continue
+            if oldest_alertable and posted(deal) < oldest_alertable:
+                continue
+            fresh.append(deal)
         if not fresh:
             return
         best = None
@@ -283,14 +297,27 @@ class Poller:
         # Count what the user can actually see, not what was ingested.
         self.status["new_since_open"] += len(fresh)
 
-        # A word the user typed themselves outranks any score threshold, so the
-        # watch pass runs first and claims the deal it matched.
-        watch_id = self._note_watch(cfg, fresh)
+        # A pinned product outranks a watched word, which outranks the score.
+        # Whichever claims a deal first owns it, so one find makes one sound.
+        pin = next((d for d in fresh if d.get("_pinned")), None)
+        if pin:
+            self.status["watch_ping"] += 1
+            self.status["watch_hit"] = self._alert_payload(pin, pin["title"], pinned=True)
+            self._send_outbound(cfg, pin, "Pinned product")
+            watch_id = pin["id"]
+        else:
+            watch_id = self._note_watch(cfg, fresh)
+            if watch_id:
+                hit = next((d for d in fresh if d["id"] == watch_id), None)
+                if hit:
+                    self._send_outbound(cfg, hit, "Watched keyword")
 
         banner_id = best["id"] if best and best["score"] >= cfg["alert_score"] else None
         self._note_sound_only(cfg, fresh, banner_id, watch_id)
 
         if best and best["score"] >= cfg["alert_score"]:
+            if best["id"] != watch_id:
+                self._send_outbound(cfg, best, "Possible price error")
             self.status["top_new"] = {
                 "title": best["title"],
                 "score": best["score"],
@@ -303,6 +330,37 @@ class Poller:
                 "discount_pct": best.get("discount_pct"),
                 "image": best.get("image") or "",
             }
+
+    def _alert_payload(self, deal, keyword, pinned=False):
+        return {
+            "id": deal["id"],
+            "keyword": "pinned" if pinned else keyword,
+            "title": deal["title"],
+            "score": deal.get("score"),
+            "url": (deal.get("direct_url") or deal.get("out_url") or deal.get("url")),
+            "retailer": deal.get("retailer") or "",
+            "price": deal.get("price"),
+            "discount_pct": deal.get("discount_pct"),
+            "image": deal.get("image") or "",
+        }
+
+    def _send_outbound(self, cfg, deal, reason):
+        """Push to Discord/Telegram off-thread; a slow webhook must not stall polling."""
+        if not any(notify.configured(cfg).values()):
+            return
+
+        def run():
+            try:
+                results = notify.send(cfg, deal, reason)
+                failed = [k for k, v in results.items() if not v.get("ok")]
+                self.status["notify_error"] = (
+                    f"{failed[0]}: {results[failed[0]].get('error', 'failed')}"
+                    if failed else None
+                )
+            except Exception as exc:
+                self.status["notify_error"] = f"{type(exc).__name__}"
+
+        threading.Thread(target=run, daemon=True).start()
 
     def _note_watch(self, cfg, fresh):
         """Raise a watch alert for a new deal matching a watched keyword.

@@ -51,6 +51,14 @@ DEFAULTS = {
     # Comma-separated words to watch for. A new deal matching one of these
     # raises its own alert with a distinct sound.
     "watch_keywords": "",
+    # Pinned ASINs or product URLs, newline separated. These bypass the score
+    # and age gates: the user asked for them by name, so they always alert.
+    "watchlist": "",
+    # Outbound alert destinations. Empty means off - nothing is sent unless a
+    # destination is configured, and only alert-worthy finds are ever sent.
+    "discord_webhook": "",
+    "telegram_token": "",
+    "telegram_chat_id": "",
     # Maximum age of a listed deal, measured from when it was posted - the same
     # figure shown on the card, so the two can never disagree.
     "deal_ttl_hours": 12,

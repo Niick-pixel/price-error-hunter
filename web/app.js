@@ -880,6 +880,10 @@ function applySettings(cfg) {
     $("o-cardglow").textContent = `${cfg.card_glow_discount ?? 50}%`;
     $("cardglowon").checked = cfg.card_glow !== false;
     $("watchwords").value = cfg.watch_keywords || "";
+    $("watchlist").value = cfg.watchlist || "";
+    $("discordhook").value = cfg.discord_webhook || "";
+    $("tgtoken").value = cfg.telegram_token || "";
+    $("tgchat").value = cfg.telegram_chat_id || "";
     $("dealttl").value = String(cfg.deal_ttl_hours ?? 12);
     $("alertage").value = String(cfg.alert_max_age_minutes ?? 60);
     $("alertscore").value = String(cfg.alert_score ?? 75);
@@ -1073,6 +1077,10 @@ function saveSettings() {
     excluded_categories: selectedCategories(),
     exclude_keywords: $("keywords").value,
     watch_keywords: $("watchwords").value,
+    watchlist: $("watchlist").value,
+    discord_webhook: $("discordhook").value.trim(),
+    telegram_token: $("tgtoken").value.trim(),
+    telegram_chat_id: $("tgchat").value.trim(),
     deal_ttl_hours: Number($("dealttl").value),
     alert_max_age_minutes: Number($("alertage").value),
     bg_theme: document.querySelector(".swatch.on")?.dataset.theme || "espresso",
@@ -1085,6 +1093,36 @@ function saveSettings() {
 }
 
 // Watch words only affect future alerts, so a debounced save is enough.
+// Destinations and the pinned list all save the same debounced way.
+["watchlist", "discordhook", "tgtoken", "tgchat"].forEach((id) => {
+  let t = null;
+  $(id).addEventListener("input", () => {
+    clearTimeout(t);
+    t = setTimeout(saveSettings, 500);
+  });
+});
+
+$("testnotify").addEventListener("click", async () => {
+  const btn = $("testnotify");
+  const out = $("testnotifyresult");
+  btn.disabled = true;
+  out.textContent = "Sending…";
+  // Save first: the server sends using stored settings, so an unsaved token
+  // would test the previous value and report a confusing result.
+  saveSettings();
+  await new Promise((r) => setTimeout(r, 350));
+  try {
+    const res = await api("/api/notify/test", { method: "POST", body: "{}" });
+    out.textContent = res.ok ? `✓ ${res.note}` : `✗ ${res.note}`;
+    out.style.color = res.ok ? "var(--ok)" : "var(--error)";
+  } catch {
+    out.textContent = "✗ Could not reach the local service";
+    out.style.color = "var(--error)";
+  } finally {
+    btn.disabled = false;
+  }
+});
+
 let watchTimer = null;
 $("watchwords").addEventListener("input", () => {
   clearTimeout(watchTimer);

@@ -48,6 +48,15 @@
   --strong: var(--honey);
   --ok: #6fbf8b;
 
+  /* The alert toast floats over arbitrary content, so it carries its own
+     opaque surface and its own ink rather than borrowing the page's. */
+  --toast-bg: #2a241c;
+  --toast-bg-hover: #332c22;
+  --toast-ink: #f9f3e8;
+  --toast-ink-dim: #c9bda9;
+  --toast-kicker: #f5c47c;
+  --toast-kicker-watch: #f0d8ab;
+
   /* Type scale, 1.25 ratio, and a numeric font feature set so prices align in
      a column and never jitter as they tick over. */
   --fs-micro: 10.5px;
@@ -110,6 +119,12 @@ html[data-mode="light"] {
   --error: var(--terracotta);
   --strong: var(--honey);
   --ok: #2f6b4a;
+  --toast-bg: #fdfaf5;
+  --toast-bg-hover: #fffdf9;
+  --toast-ink: #201a11;
+  --toast-ink-dim: #5f5241;
+  --toast-kicker: #8a5311;
+  --toast-kicker-watch: #6f5322;
   color-scheme: light;
 }
 
@@ -382,6 +397,18 @@ a.linkbtn { text-decoration: none; display: inline-flex; align-items: center; }
 .setlabel { display: block; font-size: 13px; margin-bottom: 8px; }
 .setnote { display: block; font-size: 11.5px; color: var(--muted); margin-top: 2px; }
 .sethint { margin: 12px 0 0; font-size: 11.5px; color: var(--muted); line-height: 1.55; }
+
+/* One sentence under a heading explaining what the group is for. Reads as
+   prose rather than a hint, so it is a shade brighter than .sethint and sits
+   directly beneath the h3 with no rule between them. */
+.setintro {
+  margin: -4px 0 18px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--prose);
+  max-width: 62ch;
+}
+.setintro em { font-style: normal; color: var(--amber-text); }
 .setinline { margin-top: 4px; }
 
 .rangerow { display: flex; align-items: center; gap: 12px; }
@@ -490,6 +517,16 @@ a.linkbtn { text-decoration: none; display: inline-flex; align-items: center; }
   background: rgba(255, 255, 255, .09);
 }
 
+/* The pinned list is one entry per line, so it needs to be a textarea while
+   still looking like the single-line inputs beside it. */
+.kwarea {
+  resize: vertical;
+  min-height: 84px;
+  line-height: 1.6;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12.5px;
+}
+
 .hidehint { margin: 9px 0 0; font-size: 11.5px; color: var(--muted); line-height: 1.5; }
 
 .hidecard {
@@ -593,7 +630,13 @@ body.modal-open { overflow: hidden; }
   gap: 14px;
   padding: 14px 16px;
   border-radius: var(--radius);
-  background: var(--panel-2);
+  /* Opaque ground, not glass. This is the one surface that can land anywhere
+     on the page - most often straight over a white product photo - and a
+     translucent panel took its contrast from whatever happened to be behind
+     it, dropping the title to roughly 1.4:1 against a bright card. The blur
+     stays for the soft edge, but the colour underneath no longer varies. */
+  background: var(--toast-bg);
+  color: var(--toast-ink);
   border: 1px solid var(--border-strong);
   box-shadow: 0 20px 60px rgba(0, 0, 0, .6);
   backdrop-filter: saturate(180%) blur(24px);
@@ -603,7 +646,7 @@ body.modal-open { overflow: hidden; }
   animation: alertIn .55s var(--spring) both;
   transition: transform .35s var(--spring), background .25s var(--ease);
 }
-.alert:hover { transform: translateY(-3px); background: rgba(40, 40, 44, .9); }
+.alert:hover { transform: translateY(-3px); background: var(--toast-bg-hover); }
 .alert:active { transform: scale(.985); }
 
 @keyframes alertIn {
@@ -627,7 +670,7 @@ body.modal-open { overflow: hidden; }
   font-weight: 700;
   letter-spacing: .08em;
   text-transform: uppercase;
-  color: var(--amber-text);
+  color: var(--toast-kicker);
   margin-bottom: 3px;
 }
 .alerttitle {
@@ -639,13 +682,13 @@ body.modal-open { overflow: hidden; }
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
-.alertkicker.watch { color: var(--honey-text); }
-.alertmeta { font-size: 12px; color: var(--muted); margin-top: 3px; }
+.alertkicker.watch { color: var(--toast-kicker-watch); }
+.alertmeta { font-size: 12px; color: var(--toast-ink-dim); margin-top: 3px; }
 
 .alertclose {
   background: none;
   border: none;
-  color: var(--muted);
+  color: var(--toast-ink-dim);
   font-size: 19px;
   line-height: 1;
   padding: 4px 6px;
@@ -654,7 +697,7 @@ body.modal-open { overflow: hidden; }
   flex-shrink: 0;
   transition: background .2s var(--ease), color .2s var(--ease);
 }
-.alertclose:hover { background: rgba(255, 255, 255, .12); color: var(--text); }
+.alertclose:hover { background: var(--glass-edge); color: var(--toast-ink); }
 
 /* ---------- grid ---------- */
 .grid {

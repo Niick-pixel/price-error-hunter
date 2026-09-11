@@ -6,7 +6,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from . import amazon, config, creators, filters, store
+from . import amazon, config, creators, filters, notify, store
 
 TOKEN = secrets.token_urlsafe(24)
 
@@ -107,6 +107,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if parsed.path == "/api/settings":
             self._json(config.update(body))
+            return
+        if parsed.path == "/api/notify/test":
+            self._json(notify.send_test(config.load()))
             return
         if parsed.path == "/api/hide":
             store.hide_deal(body.get("id"))

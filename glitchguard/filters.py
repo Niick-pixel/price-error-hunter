@@ -168,6 +168,51 @@ def parse_keywords(raw):
     return [w.strip().lower() for w in (raw or "").split(",") if w.strip()]
 
 
+# An ASIN inside a product URL. Case-insensitive because the path segment is
+# written "/dp/" and the pasted link may be lowercased by whatever the user
+# copied it from; the capture is upper-cased afterwards either way.
+ASIN_IN_URL = re.compile(r"/(?:dp|gp/product|gp/aw/d|gp/offer-listing)/"
+                         r"([A-Za-z0-9]{10})(?![A-Za-z0-9])", re.I)
+# A line that is nothing but an ASIN. Kept strict - ten upper-case
+# alphanumerics and nothing else - so an ordinary word is never taken for one.
+BARE_ASIN = re.compile(r"^[A-Z0-9]{10}$")
+
+
+def parse_watchlist(raw):
+    """Read pinned entries, accepting a bare ASIN or a full product URL.
+
+    Users paste whatever they have to hand. A link yields its ASIN *and* is
+    kept as a URL fragment: the two match different fields, and a deal that
+    carries a direct_url but no parsed ASIN would otherwise be missed.
+    """
+    asins, urls = set(), []
+    for line in (raw or "").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if BARE_ASIN.match(line.upper()) and "://" not in line:
+            asins.add(line.upper())
+            continue
+        match = ASIN_IN_URL.search(line)
+        if match:
+            asins.add(match.group(1).upper())
+        if "://" in line:
+            urls.append(line.lower())
+    return asins, urls
+
+
+def watchlist_match(deal, pinned):
+    """True when a deal is one of the pinned products."""
+    asins, urls = pinned
+    if not asins and not urls:
+        return False
+    asin = (deal.get("asin") or "").upper()
+    if asin and asin in asins:
+        return True
+    haystack = f"{deal.get('direct_url') or ''} {deal.get('url') or ''}".lower()
+    return any(u in haystack for u in urls)
+
+
 # --- promo codes ----------------------------------------------------------
 #
 # Only fires on an explicit cue - "code", "coupon", "promo" - followed by
