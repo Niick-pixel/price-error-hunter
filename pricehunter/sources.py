@@ -30,6 +30,10 @@ SLICKDEALS_WOOT = (
     "https://slickdeals.net/newsearch.php"
     "?q=woot&searcharea=deals&searchin=first&rss=1"
 )
+SLICKDEALS_WALMART = (
+    "https://slickdeals.net/newsearch.php"
+    "?q=walmart&searcharea=deals&searchin=first&rss=1"
+)
 TECHBARGAINS_FEED = "https://www.techbargains.com/rss.xml"
 
 # TechBargains puts the price at the end of the title: "... Jumper Cables $33.33"
@@ -271,16 +275,29 @@ class SlickdealsWoot(Slickdeals):
     name = "woot"
     label = "Woot"
     feed = SLICKDEALS_WOOT
+    retailer = "Woot"
+    term = "woot"
 
     def fetch(self, session, timeout):
         out = []
         for item in Slickdeals.fetch(self, session, timeout):
-            blob = (item["url"] + " " + item["title"]).lower()
-            if "woot" not in item["retailer"].lower() and "woot" not in blob:
+            blob = (item["url"] + " " + item["title"] + " " +
+                    item["retailer"]).lower()
+            if self.term not in blob:
                 continue
-            item["retailer"] = "Woot"
+            item["retailer"] = self.retailer
             out.append(item)
         return out
+
+
+class SlickdealsWalmart(SlickdealsWoot):
+    """Walmart deals via the same search-feed trick used for Woot."""
+
+    name = "walmart"
+    label = "Walmart"
+    feed = SLICKDEALS_WALMART
+    retailer = "Walmart"
+    term = "walmart"
 
 
 class TechBargains:
@@ -339,4 +356,4 @@ def _host_label(url):
 
 
 ALL = (CamelTopDrops(), Slickdeals(), SlickdealsPopular(), SlickdealsWoot(),
-       TechBargains())
+       SlickdealsWalmart(), TechBargains())

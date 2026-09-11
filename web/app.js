@@ -29,25 +29,36 @@ const SOURCE_LABEL = {
   slickdeals_popular: "Slickdeals popular",
   techbargains: "TechBargains",
   woot: "Woot feed",
+  walmart: "Walmart feed",
 };
 
 /* Default discount at which a card gets the aurora; overridden from settings. */
 let GLOW_DISCOUNT = 50;
 
+/* mode drives the light/dark variable block in the stylesheet; bg/raised are
+   the two surfaces each theme paints on top of it. */
 const BG_THEMES = {
-  charcoal: { label: "Charcoal", bg: "#202430", raised: "#2a2f3d" },
-  slate:    { label: "Slate",    bg: "#1b2130", raised: "#262d40" },
-  midnight: { label: "Midnight", bg: "#141824", raised: "#1e2333" },
-  ink:      { label: "Ink",      bg: "#0d1117", raised: "#161b22" },
-  graphite: { label: "Graphite", bg: "#26262b", raised: "#323238" },
-  cocoa:    { label: "Cocoa",    bg: "#241f1d", raised: "#302926" },
+  charcoal: { label: "Charcoal", mode: "dark",  bg: "#202430", raised: "#2a2f3d" },
+  slate:    { label: "Slate",    mode: "dark",  bg: "#1b2130", raised: "#262d40" },
+  midnight: { label: "Midnight", mode: "dark",  bg: "#141824", raised: "#1e2333" },
+  ink:      { label: "Ink",      mode: "dark",  bg: "#0d1117", raised: "#161b22" },
+  graphite: { label: "Graphite", mode: "dark",  bg: "#26262b", raised: "#323238" },
+  cocoa:    { label: "Cocoa",    mode: "dark",  bg: "#241f1d", raised: "#302926" },
+  daylight: { label: "Daylight", mode: "light", bg: "#eef1f6", raised: "#ffffff" },
+  paper:    { label: "Paper",    mode: "light", bg: "#f6f3ee", raised: "#fffdfa" },
+  mist:     { label: "Mist",     mode: "light", bg: "#e8eef2", raised: "#f9fcfd" },
 };
 
 function applyTheme(name) {
   const t = BG_THEMES[name] || BG_THEMES.charcoal;
-  const root = document.documentElement.style;
-  root.setProperty("--bg", t.bg);
-  root.setProperty("--bg-raised", t.raised);
+  const root = document.documentElement;
+  root.style.setProperty("--bg", t.bg);
+  root.style.setProperty("--bg-raised", t.raised);
+  root.dataset.mode = t.mode;
+  // The page washes are tuned for a dark ground and turn to mud on a light
+  // one, so they are dialled back rather than removed.
+  root.style.setProperty("--wash-a", t.mode === "light" ? ".10" : ".10");
+  root.style.setProperty("--wash-b", t.mode === "light" ? ".09" : ".09");
   document.querySelectorAll(".swatch").forEach((s) =>
     s.classList.toggle("on", s.dataset.theme === name)
   );
@@ -772,6 +783,7 @@ function applySettings(cfg) {
     $("o-cardglow").textContent = `${cfg.card_glow_discount ?? 50}%`;
     $("cardglowon").checked = cfg.card_glow !== false;
     $("watchwords").value = cfg.watch_keywords || "";
+    $("dealttl").value = String(cfg.deal_ttl_hours ?? 3);
     $("alertscore").value = String(cfg.alert_score ?? 75);
     $("o-alertscore").textContent = String(cfg.alert_score ?? 75);
     GLOW_DISCOUNT = cfg.card_glow_discount ?? 50;
@@ -817,6 +829,7 @@ const SOURCE_KEYS = [
   ["source_slickdeals", "Slickdeals"],
   ["source_slickdeals_popular", "Slickdeals popular"],
   ["source_woot", "Woot"],
+  ["source_walmart", "Walmart"],
   ["source_techbargains", "TechBargains"],
 ];
 
@@ -962,6 +975,7 @@ function saveSettings() {
     excluded_categories: selectedCategories(),
     exclude_keywords: $("keywords").value,
     watch_keywords: $("watchwords").value,
+    deal_ttl_hours: Number($("dealttl").value),
     bg_theme: document.querySelector(".swatch.on")?.dataset.theme || "charcoal",
     card_glow: $("cardglowon").checked,
     card_glow_discount: Number($("cardglow").value),
@@ -997,6 +1011,11 @@ $("keywords").addEventListener("input", () => {
 ["sound", "interval", "livecheck", "sounddiscount"].forEach((id) =>
   $(id).addEventListener("change", saveSettings)
 );
+
+$("dealttl").addEventListener("change", () => {
+  saveSettings();
+  load();          // retention changes what is listed straight away
+});
 
 $("screenglow").addEventListener("change", () => {
   saveSettings();

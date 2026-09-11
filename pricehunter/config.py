@@ -42,6 +42,7 @@ DEFAULTS = {
     "source_slickdeals": True,
     "source_slickdeals_popular": True,
     "source_woot": True,
+    "source_walmart": True,
     "source_techbargains": True,
     # Product types to hide. Books are on by default because Kindle price drops
     # otherwise dominate the Amazon feeds.
@@ -50,6 +51,9 @@ DEFAULTS = {
     # Comma-separated words to watch for. A new deal matching one of these
     # raises its own alert with a distinct sound.
     "watch_keywords": "",
+    # How long a deal stays listed after it was last seen in any feed. These
+    # feeds are rolling windows, so absence does not mean the deal ended.
+    "deal_ttl_hours": 3,
     "amazon_live_check": False,
     "amazon_min_gap": 25,
     "amazon_hourly_cap": 12,

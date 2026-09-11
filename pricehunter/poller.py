@@ -41,6 +41,14 @@ class Poller:
         self._backoff = 0.0
 
     def start(self):
+        # Repair rows retired by the old absence rule that are still within the
+        # retention window, so the fix applies to deals already in the database
+        # rather than only to new ones.
+        cfg = config.load()
+        revived = store.revive_recent(float(cfg.get("deal_ttl_hours", 3)) * 3600)
+        if revived:
+            print(f"Restored {revived} deals retired by the old expiry rule.")
+
         self._thread = threading.Thread(target=self._loop, daemon=True)
         self._thread.start()
 
@@ -83,6 +91,10 @@ class Poller:
             # Extra feeds run every cycle, independently of the main listing's
             # 304 handling, and one failing feed must not stop the others.
             fresh += self._fetch_sources(cfg)
+
+            # Age retires deals now, not absence from a rolling window.
+            ttl = float(cfg.get("deal_ttl_hours", 3)) * 3600
+            store.expire_stale(ttl)
 
             # Quiet means quiet everywhere, not just on the main listing.
             if fresh:

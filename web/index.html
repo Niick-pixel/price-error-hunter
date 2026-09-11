@@ -40,6 +40,10 @@
     <span class="tabname">Woot</span>
     <span class="tabcount" id="count-woot">—</span>
   </button>
+  <button class="tab" data-view="walmart">
+    <span class="tabname">Walmart</span>
+    <span class="tabcount" id="count-walmart">—</span>
+  </button>
   <button class="tab tabsettings" data-view="settings">
     <span class="tabname">Settings</span>
   </button>
@@ -158,6 +162,20 @@
     <p class="sethint">
       Hidden product types never raise an alert, whatever they score.
     </p>
+
+    <div class="setrow" style="margin-top:18px">
+      <label class="setlabel" for="dealttl">
+        Keep deals for
+        <span class="setnote">these feeds are rolling lists, so leaving one does not mean the deal ended</span>
+      </label>
+      <select id="dealttl">
+        <option value="1">1 hour</option>
+        <option value="3">3 hours</option>
+        <option value="6">6 hours</option>
+        <option value="12">12 hours</option>
+        <option value="24">24 hours</option>
+      </select>
+    </div>
 
     <div class="setrow" style="margin-top:18px">
       <label class="setlabel" for="watchwords">

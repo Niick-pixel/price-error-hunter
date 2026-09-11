@@ -181,15 +181,40 @@ def upsert_listing(items, source="hiddenclearances"):
                     prev, item["id"],
                 ),
             )
-    if seen_ids:
-        # Scope expiry to this source, so one feed never retires another's deals.
-        marks = ",".join("?" * len(seen_ids))
-        db.execute(
-            f"UPDATE deals SET gone=1 WHERE gone=0 AND source=? AND id NOT IN ({marks})",
-            [source] + seen_ids,
-        )
+    # Deliberately no expiry here. Most of these feeds are rolling windows -
+    # Camel publishes the current top 20 drops, TechBargains 60 of hundreds -
+    # so an item dropping out means it was pushed down the list, not that the
+    # deal ended. Retiring on absence killed 99% of rows, many within the same
+    # cycle they were found, which is why alerts pointed at deals that were
+    # already gone from the list. Age decides now; see expire_stale.
     db.commit()
     return fresh
+
+
+def expire_stale(ttl_seconds):
+    """Retire deals not seen in any feed for ttl_seconds. Returns the count."""
+    db = conn()
+    cutoff = time.time() - ttl_seconds
+    cur = db.execute(
+        "UPDATE deals SET gone=1 WHERE gone=0 AND last_seen < ?", (cutoff,)
+    )
+    db.commit()
+    return cur.rowcount
+
+
+def revive_recent(ttl_seconds):
+    """Bring back deals retired by the old absence rule that are still fresh.
+
+    One-off repair on startup: without it every deal expired under the previous
+    logic would stay hidden for good.
+    """
+    db = conn()
+    cutoff = time.time() - ttl_seconds
+    cur = db.execute(
+        "UPDATE deals SET gone=0 WHERE gone=1 AND last_seen >= ?", (cutoff,)
+    )
+    db.commit()
+    return cur.rowcount
 
 
 def pending_detail_ids(limit):
@@ -271,7 +296,7 @@ def get(deal_id):
     return _to_dict(row) if row else None
 
 
-SECTIONS = ("feed", "amazon", "woot")
+SECTIONS = ("feed", "amazon", "woot", "walmart")
 
 
 def in_section(deal, section):
@@ -285,12 +310,12 @@ def in_section(deal, section):
         # Amazon product, so a known ASIN is proof enough.
         return ((deal.get("retailer") or "").lower() == "amazon"
                 or bool(deal.get("asin")))
-    if section == "woot":
+    if section in ("woot", "walmart"):
         blob = " ".join([
             deal.get("retailer") or "", deal.get("direct_url") or "",
             deal.get("url") or "", deal.get("source") or "",
         ]).lower()
-        return "woot" in blob
+        return section in blob
     return True
 
 

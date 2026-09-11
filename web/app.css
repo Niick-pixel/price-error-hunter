@@ -3,10 +3,24 @@
      translucent panels something to sit on. */
   --bg: #202430;
   --bg-raised: #2a2f3d;
+  /* Glass is a tint plus a blur plus a lit edge. The tint is what the surface
+     adds to whatever shows through it, so on dark themes it lightens and on
+     light themes it has to darken - hence these being theme variables rather
+     than fixed rgba() values scattered through the rules. */
   --panel: rgba(255, 255, 255, .05);
   --panel-2: rgba(255, 255, 255, .085);
   --border: rgba(255, 255, 255, .11);
   --border-strong: rgba(255, 255, 255, .2);
+  /* The bright inner hairline along a glass edge that sells the material. */
+  --glass-edge: rgba(255, 255, 255, .16);
+  --glass-blur: 22px;
+  --shadow-soft: 0 18px 40px rgba(0, 0, 0, .40);
+  --shadow-lift: 0 22px 50px rgba(0, 0, 0, .55);
+  --thumb-bg: #fff;
+  /* Ink for the placeholder tile and for body prose, both of which sit on
+     surfaces that flip with the theme. */
+  --thumb-ink: rgba(255, 255, 255, .30);
+  --prose: #c4cede;
   --text: #f2f4f7;
   /* Lifted from #86868b, which failed contrast on this lighter background. */
   --muted: #a2a9b4;
@@ -22,6 +36,32 @@
   --spring: cubic-bezier(.34, 1.56, .64, 1);
   --ease: cubic-bezier(.25, .1, .25, 1);
   --ease-out: cubic-bezier(.16, 1, .3, 1);
+}
+
+/* Light themes invert every glass assumption: the tint has to darken instead
+   of lighten, shadows soften, and native controls need a light colour-scheme
+   or the select popups render white-on-white. */
+html[data-mode="light"] {
+  --panel: rgba(255, 255, 255, .55);
+  --panel-2: rgba(255, 255, 255, .78);
+  --border: rgba(15, 23, 42, .10);
+  --border-strong: rgba(15, 23, 42, .20);
+  --glass-edge: rgba(255, 255, 255, .85);
+  --shadow-soft: 0 14px 34px rgba(15, 23, 42, .10);
+  --shadow-lift: 0 20px 44px rgba(15, 23, 42, .16);
+  --thumb-bg: #fff;
+  --thumb-ink: rgba(15, 23, 42, .34);
+  --prose: #334155;
+  --text: #111726;
+  --muted: #5a6474;
+  /* Darker than the dark-theme orange: #e8590c only reaches 3.16 against a
+     pale ground, short of the 4.5 needed for the small retailer label. This
+     also improves the white-on-orange quicklink. */
+  --brand: #a83f06;
+  --error: #b42318;
+  --strong: #92400e;
+  --ok: #046c4e;
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; }
@@ -75,13 +115,14 @@ body {
   align-items: center;
   gap: 20px;
   padding: 16px 32px;
-  background: rgba(24, 27, 36, .82);
+  background: var(--panel-2);
   border-bottom: 1px solid var(--border);
+  box-shadow: inset 0 -1px 0 var(--glass-edge);
   position: sticky;
   top: 0;
   z-index: 30;
-  backdrop-filter: saturate(180%) blur(22px);
-  -webkit-backdrop-filter: saturate(180%) blur(22px);
+  backdrop-filter: saturate(180%) blur(var(--glass-blur));
+  -webkit-backdrop-filter: saturate(180%) blur(var(--glass-blur));
   flex-wrap: wrap;
 }
 
@@ -164,7 +205,9 @@ a.linkbtn { text-decoration: none; display: inline-flex; align-items: center; }
   gap: 4px;
   padding: 0 26px;
   border-bottom: 1px solid var(--border);
-  background: rgba(24, 27, 36, .55);
+  background: var(--panel);
+  backdrop-filter: saturate(160%) blur(var(--glass-blur));
+  -webkit-backdrop-filter: saturate(160%) blur(var(--glass-blur));
 }
 
 .tab {
@@ -268,6 +311,9 @@ a.linkbtn { text-decoration: none; display: inline-flex; align-items: center; }
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 20px 22px 22px;
+  backdrop-filter: saturate(180%) blur(var(--glass-blur));
+  -webkit-backdrop-filter: saturate(180%) blur(var(--glass-blur));
+  box-shadow: var(--shadow-soft), inset 0 1px 0 var(--glass-edge);
   animation: panelIn .4s var(--ease-out) both;
 }
 
@@ -495,7 +541,7 @@ body.modal-open { overflow: hidden; }
   gap: 14px;
   padding: 14px 16px;
   border-radius: var(--radius);
-  background: rgba(28, 28, 30, .82);
+  background: var(--panel-2);
   border: 1px solid var(--border-strong);
   box-shadow: 0 20px 60px rgba(0, 0, 0, .6);
   backdrop-filter: saturate(180%) blur(24px);
@@ -578,13 +624,17 @@ body.modal-open { overflow: hidden; }
 .empty { text-align: center; color: var(--muted); padding: 70px 30px; font-size: 15px; }
 
 .card {
+  position: relative;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
   cursor: pointer;
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  /* saturate() is the part that makes a blur read as glass rather than fog:
+     colours behind the surface stay vivid instead of washing grey. */
+  backdrop-filter: saturate(180%) blur(var(--glass-blur));
+  -webkit-backdrop-filter: saturate(180%) blur(var(--glass-blur));
+  box-shadow: var(--shadow-soft), inset 0 1px 0 var(--glass-edge);
   transition: transform .5s var(--spring), border-color .3s var(--ease),
               box-shadow .45s var(--ease-out), background .3s var(--ease);
 }
@@ -592,20 +642,20 @@ body.modal-open { overflow: hidden; }
   transform: translateY(-6px);
   border-color: var(--border-strong);
   background: var(--panel-2);
-  box-shadow: 0 22px 50px rgba(0, 0, 0, .55);
+  box-shadow: var(--shadow-lift), inset 0 1px 0 var(--glass-edge);
 }
 .card:active { transform: translateY(-2px) scale(.995); }
 
 .card .thumb {
   position: relative;
-  /* Dark until a real image arrives, so a missing thumbnail is never a
-     glaring white rectangle. .hasimg switches it to the photo backdrop. */
-  background: linear-gradient(150deg, #1c1c1e, #121214);
+  /* Muted until a real image arrives, so a missing thumbnail is never a
+     glaring rectangle. .hasimg switches it to the photo backdrop. */
+  background: var(--panel-2);
   height: 172px;
   overflow: hidden;
   transition: background .3s var(--ease);
 }
-.card .thumb.hasimg { background: #fff; }
+.card .thumb.hasimg { background: var(--thumb-bg); }
 
 /* Hidden while an image is still loading, so cards do not flash a placeholder
    letter before the photo arrives. Shown only when there is no usable image. */
@@ -626,14 +676,14 @@ body.modal-open { overflow: hidden; }
   font-size: 34px;
   font-weight: 600;
   letter-spacing: -.03em;
-  color: rgba(255, 255, 255, .28);
+  color: var(--thumb-ink);
   line-height: 1;
 }
 .fbname {
   font-size: 10.5px;
   letter-spacing: .1em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, .3);
+  color: var(--thumb-ink);
 }
 /* ---------- big-discount glow ----------
    Applied to any deal at or above GLOW_DISCOUNT (50%). It is a backlight, not
@@ -708,6 +758,56 @@ body.modal-open { overflow: hidden; }
                  20px  18px 42px -6px rgba( 34, 211, 238, .46),
                 -20px  18px 42px -6px rgba(123,  92, 255, .48);
   }
+}
+
+/* Light theme needs the opposite glow. The bright neons vanish against white -
+   a light halo on a light page is invisible - so the same four hues are taken
+   down in lightness and up in saturation, reading as coloured shade rather
+   than coloured light. Opacity rises too, since a dark wash on white needs
+   less help than a bright one on black. */
+html[data-mode="light"] .card.glow {
+  border-color: rgba(15, 23, 42, .18);
+  animation: cardAuroraLight 9s linear infinite;
+}
+
+@keyframes cardAuroraLight {
+  0%, 100% {
+    box-shadow: -18px -12px 30px -8px rgba(190,  24, 120, .55),
+                 18px -12px 30px -8px rgba(194,  65,  12, .50),
+                 18px  16px 34px -8px rgba(  6, 110, 140, .50),
+                -18px  16px 34px -8px rgba( 67,  56, 202, .52);
+  }
+  25% {
+    box-shadow: -18px -12px 30px -8px rgba( 67,  56, 202, .52),
+                 18px -12px 30px -8px rgba(190,  24, 120, .55),
+                 18px  16px 34px -8px rgba(194,  65,  12, .50),
+                -18px  16px 34px -8px rgba(  6, 110, 140, .50);
+  }
+  50% {
+    box-shadow: -18px -12px 30px -8px rgba(  6, 110, 140, .50),
+                 18px -12px 30px -8px rgba( 67,  56, 202, .52),
+                 18px  16px 34px -8px rgba(190,  24, 120, .55),
+                -18px  16px 34px -8px rgba(194,  65,  12, .50);
+  }
+  75% {
+    box-shadow: -18px -12px 30px -8px rgba(194,  65,  12, .50),
+                 18px -12px 30px -8px rgba(  6, 110, 140, .50),
+                 18px  16px 34px -8px rgba( 67,  56, 202, .52),
+                -18px  16px 34px -8px rgba(190,  24, 120, .55);
+  }
+}
+
+html[data-mode="light"] .card.glow:hover {
+  animation: none;
+  box-shadow: var(--shadow-lift),
+              -20px -14px 36px -6px rgba(190,  24, 120, .68),
+               20px -14px 36px -6px rgba(194,  65,  12, .60),
+               20px  18px 40px -6px rgba(  6, 110, 140, .60),
+              -20px  18px 40px -6px rgba( 67,  56, 202, .64);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-mode="light"] .card.glow { animation: none; }
 }
 
 /* A slow zoom on hover, the way Apple treats product photography. */
@@ -821,13 +921,13 @@ body.modal-open { overflow: hidden; }
 .scorebar { height: 7px; border-radius: 4px; background: var(--panel-2); overflow: hidden; margin-top: 8px; }
 .scorebar i { display: block; height: 100%; border-radius: 4px; }
 
-.why { margin: 0 0 14px; padding-left: 18px; font-size: 13px; color: #c4cede; }
+.why { margin: 0 0 14px; padding-left: 18px; font-size: 13px; color: var(--prose); }
 .why li { margin: 3px 0; }
 
 .desc {
   white-space: pre-wrap;
   font-size: 13px;
-  color: #c4cede;
+  color: var(--prose);
   background: var(--panel-2);
   border-radius: 10px;
   padding: 11px 13px;

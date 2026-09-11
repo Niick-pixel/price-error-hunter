@@ -151,11 +151,12 @@ legitimately and far more reliably.
 
 The **Settings** tab holds everything that is set once and forgotten:
 
-- **Appearance** — six background themes, the discount at which cards get the
-  aurora glow, and a switch to turn that glow off.
+- **Appearance** — nine themes, six dark and three light, the discount at which
+  cards get the aurora glow, and a switch to turn that glow off.
 - **Alerts** — the score a find must reach to raise a notification card.
-- **Deal sources** — all six feeds, individually switchable. Turning one off
+- **Deal sources** — all seven feeds, individually switchable. Turning one off
   stops polling it on the next cycle.
+- **Keep deals for** — how long a deal stays listed after it was last seen.
 - **Hidden product types** — the category pills and keyword box.
 
 The toolbar keeps only what changes often, ordered dropdowns first and
@@ -198,7 +199,23 @@ caught**. It is not perfect: a title like *Habsburgs on the Rio Grande* at $14.7
 sits above the price band and stays. For those, use the keyword box or the
 **Hide this deal** button on any card, which removes it permanently.
 
-## Three sections
+## How long deals stay listed
+
+Most of these feeds are **rolling windows** — CamelCamelCamel publishes the
+current top 20 drops, TechBargains 60 of hundreds — so an item falling off a
+list means it was pushed down by newer entries, not that the deal ended.
+
+Retiring deals on absence therefore killed almost everything: **99% of rows were
+marked gone, and 10,512 of them vanished while still flagged new**, some within
+the very cycle they were found. That is why an alert could point at a deal that
+was no longer in the list.
+
+Age decides instead. A deal stays listed until it has not been seen in any feed
+for **Keep deals for** hours (default 3), which at the observed ~35 new deals an
+hour keeps a few hundred live at a time. Deals that reappear are un-retired
+automatically.
+
+## Four sections
 
 The tabs at the top split the app in two:
 
@@ -206,6 +223,7 @@ The tabs at the top split the app in two:
 - **Amazon** — only deals that resolve to an Amazon product, each with its ASIN,
   a direct product link, and a real Amazon price-history chart.
 - **Woot** — Woot deals gathered from every source, not just the Woot feed.
+- **Walmart** — the same, for Walmart.
 
 A tab is a view over the same query rather than a separate fetch: one request
 returns the listing and all three counts, so a tab can never advertise a number
