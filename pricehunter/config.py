@@ -51,9 +51,9 @@ DEFAULTS = {
     # Comma-separated words to watch for. A new deal matching one of these
     # raises its own alert with a distinct sound.
     "watch_keywords": "",
-    # How long a deal stays listed after it was last seen in any feed. These
-    # feeds are rolling windows, so absence does not mean the deal ended.
-    "deal_ttl_hours": 3,
+    # Maximum age of a listed deal, measured from when it was posted - the same
+    # figure shown on the card, so the two can never disagree.
+    "deal_ttl_hours": 12,
     "amazon_live_check": False,
     "amazon_min_gap": 25,
     "amazon_hourly_cap": 12,

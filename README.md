@@ -156,7 +156,7 @@ The **Settings** tab holds everything that is set once and forgotten:
 - **Alerts** — the score a find must reach to raise a notification card.
 - **Deal sources** — all seven feeds, individually switchable. Turning one off
   stops polling it on the next cycle.
-- **Keep deals for** — how long a deal stays listed after it was last seen.
+- **Hide deals older than** — the maximum age of a listed deal.
 - **Hidden product types** — the category pills and keyword box.
 
 The toolbar keeps only what changes often, ordered dropdowns first and
@@ -210,10 +210,22 @@ marked gone, and 10,512 of them vanished while still flagged new**, some within
 the very cycle they were found. That is why an alert could point at a deal that
 was no longer in the list.
 
-Age decides instead. A deal stays listed until it has not been seen in any feed
-for **Keep deals for** hours (default 3), which at the observed ~35 new deals an
-hour keeps a few hundred live at a time. Deals that reappear are un-retired
-automatically.
+**Hide deals older than** (Settings, default 12 hours) replaces that. Age is
+measured from when the deal was posted — the same figure printed on the card —
+and the limit is applied when the list is built, not only by the background
+sweep, so changing it takes effect at once and nothing over the limit can slip
+through. Deals already past the limit never raise an alert either, for the same
+reason hidden categories do not: an alert should never point at something the
+list will not show.
+
+### Why the card ages were wrong
+
+The age on a card used to come from whatever the feed last claimed. Two feeds
+republish items with fresh timestamps, so **44 of 60 TechBargains rows were
+labelled "4 hr ago" while genuinely nine days old**, and the setting appeared to
+do nothing. The label now derives from `posted_at`, fixed when a deal is first
+seen, which is also what the sort and the age limit read — so the three cannot
+disagree.
 
 ## Four sections
 

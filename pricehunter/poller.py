@@ -251,9 +251,15 @@ class Poller:
         cats, words = filters.settings_filter(cfg)
         # Hidden product types must not ring either. Filtering here covers both
         # the banner and the sound-only pass below, since both read this list.
+        # Never alert on something the listing will not show. Deals already
+        # older than the age limit are invisible, so ringing for them would
+        # point at nothing - the same reasoning as hidden product types.
+        max_age = float(cfg.get("deal_ttl_hours") or 0) * 3600
+        oldest = time.time() - max_age if max_age else 0
         fresh = [
             d for d in (store.get(i) for i in fresh_ids)
             if d and not filters.suppressed(d, cats, words)
+            and (not oldest or (d.get("posted_at") or d.get("first_seen") or 0) >= oldest)
         ]
         if not fresh:
             return

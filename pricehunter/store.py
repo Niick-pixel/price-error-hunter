@@ -191,27 +191,46 @@ def upsert_listing(items, source="hiddenclearances"):
     return fresh
 
 
-def expire_stale(ttl_seconds):
-    """Retire deals not seen in any feed for ttl_seconds. Returns the count."""
+GRACE_SECONDS = 3600
+
+
+def expire_stale(max_age_seconds):
+    """Retire deals older than max_age_seconds. Returns the count.
+
+    Age is measured from posted_at, the same clock the age label shows, so the
+    setting means exactly what it says - with a limit of 3 hours nothing can
+    still be listed reading "16 hr ago".
+
+    The grace window is the safeguard: a deal found when it was already near
+    the limit stays for an hour regardless, so an alert can never point at
+    something that vanishes moments later. That was the original bug and it
+    must not come back through the age rule.
+    """
     db = conn()
-    cutoff = time.time() - ttl_seconds
+    now = time.time()
     cur = db.execute(
-        "UPDATE deals SET gone=1 WHERE gone=0 AND last_seen < ?", (cutoff,)
+        "UPDATE deals SET gone=1 WHERE gone=0"
+        " AND COALESCE(posted_at, first_seen) < ?"
+        " AND first_seen < ?",
+        (now - max_age_seconds, now - GRACE_SECONDS),
     )
     db.commit()
     return cur.rowcount
 
 
-def revive_recent(ttl_seconds):
+def revive_recent(max_age_seconds):
     """Bring back deals retired by the old absence rule that are still fresh.
 
     One-off repair on startup: without it every deal expired under the previous
-    logic would stay hidden for good.
+    logic would stay hidden for good. Scoped to the same age rule used for
+    expiry, so nothing older than the limit is resurrected.
     """
     db = conn()
-    cutoff = time.time() - ttl_seconds
+    cutoff = time.time() - max_age_seconds
     cur = db.execute(
-        "UPDATE deals SET gone=0 WHERE gone=1 AND last_seen >= ?", (cutoff,)
+        "UPDATE deals SET gone=0 WHERE gone=1 AND last_seen >= ?"
+        " AND COALESCE(posted_at, first_seen) >= ?",
+        (cutoff, cutoff),
     )
     db.commit()
     return cur.rowcount
@@ -320,11 +339,18 @@ def in_section(deal, section):
 
 
 def list_deals(section="feed", min_discount=0, sort="score", limit=300,
-               exclude_categories=(), exclude_keywords=()):
+               exclude_categories=(), exclude_keywords=(), max_age_hours=None):
     # Category and keyword exclusion is applied in Python below rather than
     # here, so there is exactly one definition of "hidden" shared with alerts.
     where = ["gone=0", "hidden=0"]
     args = []
+    if max_age_hours:
+        # Applied here as well as in the expiry job so the setting bites the
+        # moment it is changed, instead of waiting for the next poll, and so
+        # nothing inside the expiry grace window can still be listed older
+        # than the limit the user chose.
+        where.append("COALESCE(posted_at, first_seen) >= ?")
+        args.append(time.time() - float(max_age_hours) * 3600)
     if min_discount:
         where.append("discount_pct >= ?")
         args.append(min_discount)
@@ -366,10 +392,30 @@ def clear_new_flags(ids):
     db.commit()
 
 
+def age_label(posted_at):
+    """Human age from the one timestamp everything else agrees on."""
+    if not posted_at:
+        return ""
+    minutes = max(0, int((time.time() - posted_at) / 60))
+    if minutes < 1:
+        return "just now"
+    if minutes < 60:
+        return f"{minutes} min ago"
+    if minutes < 1440:
+        return f"{minutes // 60} hr ago"
+    return f"{minutes // 1440} days ago"
+
+
 def _to_dict(row):
     data = dict(row)
     try:
         data["reasons"] = json.loads(data.get("reasons") or "[]")
     except ValueError:
         data["reasons"] = []
+    # The stored age_text is whatever the feed last claimed, and TechBargains
+    # and Slickdeals' popular list republish items with fresh dates - 44 of 60
+    # TechBargains rows were labelled "4 hr ago" while genuinely nine days old.
+    # posted_at is fixed when a deal is first seen, so the label, the sort and
+    # the age cutoff all read from it and cannot disagree.
+    data["age_text"] = age_label(data.get("posted_at")) or data.get("age_text") or ""
     return data

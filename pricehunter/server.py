@@ -140,6 +140,7 @@ class Handler(BaseHTTPRequestHandler):
             section="feed", min_discount=min_discount, sort=sort,
             exclude_categories=cfg.get("excluded_categories") or (),
             exclude_keywords=keywords,
+            max_age_hours=cfg.get("deal_ttl_hours"),
         )
         counts = {
             name: sum(1 for d in everything if store.in_section(d, name))
