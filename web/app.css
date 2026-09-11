@@ -48,6 +48,25 @@
   --strong: var(--honey);
   --ok: #6fbf8b;
 
+  /* Glow. Held as bare RGB triples so alpha can be varied independently by
+     the strength setting, and so "single colour" mode only has to overwrite
+     four numbers rather than rebuild every shadow. */
+  --glow-h1: 236 92 168;    /* magenta */
+  --glow-h2: 92 200 235;    /* cyan */
+  --glow-h3: 140 120 245;   /* violet */
+  --glow-h4: 245 140 110;   /* coral */
+  /* Set by the strength setting; these are the values for 70. The base pair is
+     what strength writes, and the live pair is what the shadows read - hover
+     raises the live value without losing what strength asked for. */
+  --glow-a-base: .57;
+  --glow-front-base: .15;
+  --glow-a: var(--glow-a-base);
+  --glow-front: var(--glow-front-base);
+  --glow-off: 20px;
+  --glow-blur: 44px;
+  --glow-spread: -6px;
+  --glow-front-blend: screen;
+
   /* The alert toast floats over arbitrary content, so it carries its own
      opaque surface and its own ink rather than borrowing the page's. */
   --toast-bg: #2a241c;
@@ -125,6 +144,15 @@ html[data-mode="light"] {
   --toast-ink-dim: #5f5241;
   --toast-kicker: #8a5311;
   --toast-kicker-watch: #6f5322;
+  /* A bright halo is invisible on a light page, so the same four hues drop in
+     lightness and gain saturation - coloured shade rather than coloured light -
+     and the front wash multiplies into the surface instead of screening over
+     it, which would only wash it out. */
+  --glow-h1: 190 40 120;
+  --glow-h2: 20 120 160;
+  --glow-h3: 88 70 200;
+  --glow-h4: 200 80 55;
+  --glow-front-blend: multiply;
   color-scheme: light;
 }
 
@@ -519,6 +547,49 @@ a.linkbtn { text-decoration: none; display: inline-flex; align-items: center; }
 
 /* The pinned list is one entry per line, so it needs to be a textarea while
    still looking like the single-line inputs beside it. */
+/* Two-option segmented control, with the colour well tucked on the end so the
+   choice and the value it needs sit on one line. */
+.seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+}
+.segbtn {
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: background .25s var(--ease), color .25s var(--ease);
+}
+.segbtn:hover { color: var(--text); }
+.segbtn.on {
+  background: linear-gradient(135deg, var(--amber), var(--amber-deep));
+  color: #2a1b06;
+}
+html[data-mode="light"] .segbtn.on { color: #fdf6ea; }
+
+/* Hidden rather than disabled while the rainbow preset is on: a colour well
+   that does nothing is more confusing than one that is not there. */
+#glowcolor {
+  width: 34px;
+  height: 28px;
+  padding: 2px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--panel);
+  cursor: pointer;
+}
+#glowcolor.hidden { display: none; }
+
 .kwarea {
   resize: vertical;
   min-height: 84px;
@@ -863,104 +934,86 @@ body.modal-open { overflow: hidden; }
    is only 5% white, so a bright layer underneath shows straight through the
    body and the colour reads as being in front of the content. A box-shadow
    paints strictly outside the border box, which is the whole point. */
-.card.glow {
-  border-color: rgba(255, 255, 255, .18);
-  animation: cardAurora 9s linear infinite;
-}
+/* Four offset colour shadows, one per corner, drifting round the card so the
+   hues trade places.
 
-/* Calmer than before: three hues from the brand palette instead of four
-   unrelated neons, lower opacity, and a 14s lap rather than 9s. The effect
-   should read as the card being lit from behind, not as a light show - at 150
-   cards, anything stronger becomes noise and stops meaning anything. */
-/* Colourful, but quiet. Symmetry is kept from the fix - equal offset, blur and
-   alpha on all four corners - while the alpha is roughly 40% of what it was so
-   the halo reads as a tint around the card rather than something competing
-   with the card's own content. */
+   Every length and colour comes from a custom property, which is what makes
+   strength and single-colour mode possible without a second set of keyframes:
+   the animation only ever rotates which variable lands on which corner.
+
+   Shadows rather than a blurred child on purpose - .card sets overflow:hidden
+   for the image zoom, which would clip a child, and a negative-z child paints
+   over the card's own background rather than behind it. A box-shadow paints
+   strictly outside the border box. */
+.card.glow {
+  --g1: rgb(var(--glow-h1) / var(--glow-a));
+  --g2: rgb(var(--glow-h2) / var(--glow-a));
+  --g3: rgb(var(--glow-h3) / var(--glow-a));
+  --g4: rgb(var(--glow-h4) / var(--glow-a));
+  --glow-neg: calc(var(--glow-off) * -1);
+  border-color: rgba(255, 255, 255, .22);
+  animation: cardAurora 14s linear infinite;
+}
+html[data-mode="light"] .card.glow { border-color: rgba(15, 23, 42, .20); }
+
 @keyframes cardAurora {
   0%, 100% {
-    box-shadow: -16px -16px 30px -12px rgba(236,  92, 168, .24),
-                 16px -16px 30px -12px rgba( 92, 200, 235, .24),
-                 16px  16px 30px -12px rgba(140, 120, 245, .24),
-                -16px  16px 30px -12px rgba(245, 140, 110, .24);
+    box-shadow: var(--glow-neg) var(--glow-neg) var(--glow-blur) var(--glow-spread) var(--g1),
+                var(--glow-off) var(--glow-neg) var(--glow-blur) var(--glow-spread) var(--g2),
+                var(--glow-off) var(--glow-off) var(--glow-blur) var(--glow-spread) var(--g3),
+                var(--glow-neg) var(--glow-off) var(--glow-blur) var(--glow-spread) var(--g4);
   }
   33% {
-    box-shadow: -16px -16px 30px -12px rgba(245, 140, 110, .24),
-                 16px -16px 30px -12px rgba(236,  92, 168, .24),
-                 16px  16px 30px -12px rgba( 92, 200, 235, .24),
-                -16px  16px 30px -12px rgba(140, 120, 245, .24);
+    box-shadow: var(--glow-neg) var(--glow-neg) var(--glow-blur) var(--glow-spread) var(--g4),
+                var(--glow-off) var(--glow-neg) var(--glow-blur) var(--glow-spread) var(--g1),
+                var(--glow-off) var(--glow-off) var(--glow-blur) var(--glow-spread) var(--g2),
+                var(--glow-neg) var(--glow-off) var(--glow-blur) var(--glow-spread) var(--g3);
   }
   66% {
-    box-shadow: -16px -16px 30px -12px rgba(140, 120, 245, .24),
-                 16px -16px 30px -12px rgba(245, 140, 110, .24),
-                 16px  16px 30px -12px rgba(236,  92, 168, .24),
-                -16px  16px 30px -12px rgba( 92, 200, 235, .24);
+    box-shadow: var(--glow-neg) var(--glow-neg) var(--glow-blur) var(--glow-spread) var(--g3),
+                var(--glow-off) var(--glow-neg) var(--glow-blur) var(--glow-spread) var(--g4),
+                var(--glow-off) var(--glow-off) var(--glow-blur) var(--glow-spread) var(--g1),
+                var(--glow-neg) var(--glow-off) var(--glow-blur) var(--glow-spread) var(--g2);
   }
 }
 
-.card.glow { animation-duration: 14s; }
+/* The light also falls on the front of the card, not only behind it. Four
+   corner blooms inside the border box, screened over the surface in dark mode
+   and multiplied into it in light, so the colour reads as the card being lit
+   rather than as a coloured outline sitting around it.
 
-/* Hover lifts the bloom a little rather than switching to a different look. */
+   Clipped by the card's own overflow:hidden, which is exactly what is wanted
+   here - the wash stops at the rounded corner. */
+.card.glow::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: var(--glow-front);
+  mix-blend-mode: var(--glow-front-blend);
+  background:
+    radial-gradient(72% 58% at 6% 0%,   rgb(var(--glow-h1)) 0%, transparent 70%),
+    radial-gradient(72% 58% at 94% 0%,  rgb(var(--glow-h2)) 0%, transparent 70%),
+    radial-gradient(72% 58% at 94% 100%, rgb(var(--glow-h3)) 0%, transparent 70%),
+    radial-gradient(72% 58% at 6% 100%, rgb(var(--glow-h4)) 0%, transparent 70%);
+  transition: opacity .35s var(--ease);
+}
+
+/* The wash sits on the card's background, never on its content. Without this
+   the blend mode would tint the title and the price too. */
+.card .thumb, .card .body { position: relative; z-index: 1; }
+
+/* Hover lifts the bloom rather than switching to a different look. Pausing the
+   rotation keeps the hue under the pointer still while it is being read. */
 .card.glow:hover {
-  box-shadow: var(--shadow-lift),
-              -18px -18px 34px -10px rgba(236,  92, 168, .38),
-               18px -18px 34px -10px rgba( 92, 200, 235, .38),
-               18px  18px 34px -10px rgba(140, 120, 245, .38),
-              -18px  18px 34px -10px rgba(245, 140, 110, .38);
-  animation: none;
+  --glow-a: calc(var(--glow-a-base) + .18);
+  --glow-front: calc(var(--glow-front-base) + .06);
+  animation-play-state: paused;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .card.glow {
-    animation: none;
-    box-shadow: -16px -16px 30px -12px rgba(236,  92, 168, .24),
-                 16px -16px 30px -12px rgba( 92, 200, 235, .24),
-                 16px  16px 30px -12px rgba(140, 120, 245, .24),
-                -16px  16px 30px -12px rgba(245, 140, 110, .24);
-  }
-}
-
-/* Light theme needs the opposite glow. The bright neons vanish against white -
-   a light halo on a light page is invisible - so the same four hues are taken
-   down in lightness and up in saturation, reading as coloured shade rather
-   than coloured light. Opacity rises too, since a dark wash on white needs
-   less help than a bright one on black. */
-html[data-mode="light"] .card.glow {
-  border-color: rgba(15, 23, 42, .18);
-  animation: cardAuroraLight 9s linear infinite;
-}
-
-@keyframes cardAuroraLight {
-  0%, 100% {
-    box-shadow: -14px -14px 26px -12px rgba(190,  40, 120, .26),
-                 14px -14px 26px -12px rgba( 20, 120, 160, .26),
-                 14px  14px 26px -12px rgba( 88,  70, 200, .26),
-                -14px  14px 26px -12px rgba(200,  80,  55, .26);
-  }
-  33% {
-    box-shadow: -14px -14px 26px -12px rgba(200,  80,  55, .26),
-                 14px -14px 26px -12px rgba(190,  40, 120, .26),
-                 14px  14px 26px -12px rgba( 20, 120, 160, .26),
-                -14px  14px 26px -12px rgba( 88,  70, 200, .26);
-  }
-  66% {
-    box-shadow: -14px -14px 26px -12px rgba( 88,  70, 200, .26),
-                 14px -14px 26px -12px rgba(200,  80,  55, .26),
-                 14px  14px 26px -12px rgba(190,  40, 120, .26),
-                -14px  14px 26px -12px rgba( 20, 120, 160, .26);
-  }
-}
-
-html[data-mode="light"] .card.glow:hover {
-  animation: none;
-  box-shadow: var(--shadow-lift),
-              -16px -16px 30px -10px rgba(190,  40, 120, .38),
-               16px -16px 30px -10px rgba( 20, 120, 160, .38),
-               16px  16px 30px -10px rgba( 88,  70, 200, .38),
-              -16px  16px 30px -10px rgba(200,  80,  55, .38);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html[data-mode="light"] .card.glow { animation: none; }
+  .card.glow { animation-play-state: paused; }
 }
 
 /* A slow zoom on hover, the way Apple treats product photography. */

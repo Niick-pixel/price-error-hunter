@@ -34,6 +34,14 @@ DEFAULTS = {
     "bg_theme": "espresso",
     "card_glow": True,
     "card_glow_discount": 50,
+    # Glow appearance. "rainbow" cycles the four brand-adjacent hues; "solid"
+    # uses glow_color for all four, which stills the rotation and reads as one
+    # steady light behind the card.
+    "glow_style": "rainbow",
+    "glow_color": "#e9a23c",
+    # 0-100. Drives alpha, offset and blur together - turning one up without
+    # the others just makes a harder edge, not a brighter light.
+    "glow_strength": 70,
     "source_hiddenclearances": True,
     # Live Amazon lookups. Off by default: Amazon serves a CAPTCHA within a
     # couple of automated requests, so this is best-effort only.

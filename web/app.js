@@ -66,6 +66,50 @@ function applyTheme(name) {
   );
 }
 
+/* ---------- card glow ----------
+   Strength moves alpha, offset, blur and spread together. Raising alpha alone
+   only hardens the edge; a light that reads as brighter has to spread further
+   at the same time. */
+const GLOW_STYLE_DEFAULT = "rainbow";
+
+function glowVars(strength) {
+  const s = Math.max(0, Math.min(100, Number(strength) || 0)) / 100;
+  return {
+    "--glow-a-base": (s * 0.75).toFixed(3),
+    "--glow-front-base": (s * 0.22).toFixed(3),
+    "--glow-off": `${(10 + s * 16).toFixed(1)}px`,
+    "--glow-blur": `${(24 + s * 34).toFixed(1)}px`,
+    "--glow-spread": `${(-12 + s * 10).toFixed(1)}px`,
+  };
+}
+
+function hexTriple(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || "").trim());
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return `${(n >> 16) & 255} ${(n >> 8) & 255} ${n & 255}`;
+}
+
+function applyGlow(cfg) {
+  const root = document.documentElement;
+  const style = cfg.glow_style === "solid" ? "solid" : GLOW_STYLE_DEFAULT;
+  const vars = glowVars(cfg.glow_strength ?? 70);
+  Object.entries(vars).forEach(([k, v]) => root.style.setProperty(k, v));
+
+  const triple = style === "solid" ? hexTriple(cfg.glow_color) : null;
+  for (const n of [1, 2, 3, 4]) {
+    // Clearing the override lets each theme's own hues come back, which
+    // matters because light mode carries a different, darker set.
+    if (triple) root.style.setProperty(`--glow-h${n}`, triple);
+    else root.style.removeProperty(`--glow-h${n}`);
+  }
+
+  document.querySelectorAll("#glowstyle .segbtn").forEach((b) =>
+    b.classList.toggle("on", b.dataset.style === style)
+  );
+  $("glowcolor").classList.toggle("hidden", style !== "solid");
+}
+
 /* ---------- screen edge glow ----------
    Deliberately not tied to the background poll: that runs every couple of
    minutes and a full-screen glow on every cycle would be wallpaper. It fires
@@ -879,6 +923,10 @@ function applySettings(cfg) {
     $("cardglow").value = String(cfg.card_glow_discount ?? 50);
     $("o-cardglow").textContent = `${cfg.card_glow_discount ?? 50}%`;
     $("cardglowon").checked = cfg.card_glow !== false;
+    $("glowstrength").value = String(cfg.glow_strength ?? 70);
+    $("o-glowstrength").textContent = String(cfg.glow_strength ?? 70);
+    $("glowcolor").value = cfg.glow_color || "#e9a23c";
+    applyGlow(cfg);
     $("watchwords").value = cfg.watch_keywords || "";
     $("watchlist").value = cfg.watchlist || "";
     $("discordhook").value = cfg.discord_webhook || "";
@@ -979,6 +1027,31 @@ function buildSettings(cfg) {
     render(window.__deals || []);
   });
   bindRange("alertscore", (v) => String(v), () => {});
+
+  // Strength is pure CSS variables, so the cards never need rebuilding - the
+  // slider moves the light in place.
+  bindRange("glowstrength", (v) => String(v), (v) => {
+    settings.glow_strength = v;
+    applyGlow(settings);
+  });
+
+  document.querySelectorAll("#glowstyle .segbtn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      settings.glow_style = btn.dataset.style;
+      settings.glow_color = $("glowcolor").value;
+      applyGlow(settings);
+      saveSettings();
+    });
+  });
+
+  $("glowcolor").addEventListener("input", () => {
+    // Picking a colour is the clearest possible statement that the rainbow is
+    // not wanted, so it switches mode rather than saving a value with no effect.
+    settings.glow_style = "solid";
+    settings.glow_color = $("glowcolor").value;
+    applyGlow(settings);
+  });
+  $("glowcolor").addEventListener("change", saveSettings);
 
   $("cardglowon").addEventListener("change", () => {
     saveSettings();
@@ -1086,6 +1159,9 @@ function saveSettings() {
     bg_theme: document.querySelector(".swatch.on")?.dataset.theme || "espresso",
     card_glow: $("cardglowon").checked,
     card_glow_discount: Number($("cardglow").value),
+    glow_strength: Number($("glowstrength").value),
+    glow_style: document.querySelector("#glowstyle .segbtn.on")?.dataset.style || "rainbow",
+    glow_color: $("glowcolor").value,
     alert_score: Number($("alertscore").value),
     ...selectedSources(),
   };

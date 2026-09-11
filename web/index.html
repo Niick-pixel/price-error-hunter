@@ -142,6 +142,27 @@
       </div>
     </div>
 
+    <div class="setrow">
+      <label class="setlabel" for="glowstrength">
+        Glow strength <span class="setnote">how far the light spreads and how bright it reads</span>
+      </label>
+      <div class="rangerow">
+        <input type="range" id="glowstrength" min="0" max="100" step="5" value="70">
+        <output id="o-glowstrength">70</output>
+      </div>
+    </div>
+
+    <div class="setrow">
+      <label class="setlabel">
+        Glow colour <span class="setnote">the preset cycles four hues; a single colour holds still</span>
+      </label>
+      <div class="seg" id="glowstyle">
+        <button type="button" class="segbtn" data-style="rainbow">Rainbow</button>
+        <button type="button" class="segbtn" data-style="solid">Single colour</button>
+        <input type="color" id="glowcolor" value="#e9a23c" aria-label="Glow colour">
+      </div>
+    </div>
+
     <label class="toggle setinline">
       <input type="checkbox" id="cardglowon">
       <span>Enable card glow</span>
