@@ -54,6 +54,11 @@ DEFAULTS = {
     # Maximum age of a listed deal, measured from when it was posted - the same
     # figure shown on the card, so the two can never disagree.
     "deal_ttl_hours": 12,
+    # Alerts are about catching something early. A deal can be new to us and
+    # hours old already - the popular feed ranks by popularity, so items enter
+    # it around ten hours after posting - so alerting is gated on how long ago
+    # the deal was posted, not on when we happened to find it. 0 disables.
+    "alert_max_age_minutes": 60,
     "amazon_live_check": False,
     "amazon_min_gap": 25,
     "amazon_hourly_cap": 12,

@@ -251,15 +251,28 @@ class Poller:
         cats, words = filters.settings_filter(cfg)
         # Hidden product types must not ring either. Filtering here covers both
         # the banner and the sound-only pass below, since both read this list.
-        # Never alert on something the listing will not show. Deals already
-        # older than the age limit are invisible, so ringing for them would
-        # point at nothing - the same reasoning as hidden product types.
+        # Two separate gates, both on posted time rather than discovery time.
+        #
+        # The first hides what the listing would not show anyway. The second is
+        # about what "new" means: a deal can be new to us and already hours
+        # old, because a feed ranked by popularity only surfaces things once
+        # they are popular. Alerting on discovery meant every such alert
+        # pointed at something stale that then sorted to the bottom of the
+        # list, which is not what an alert is for.
+        now = time.time()
         max_age = float(cfg.get("deal_ttl_hours") or 0) * 3600
-        oldest = time.time() - max_age if max_age else 0
+        alert_age = float(cfg.get("alert_max_age_minutes") or 0) * 60
+        oldest_listed = now - max_age if max_age else 0
+        oldest_alertable = now - alert_age if alert_age else 0
+
+        def posted(deal):
+            return deal.get("posted_at") or deal.get("first_seen") or 0
+
         fresh = [
             d for d in (store.get(i) for i in fresh_ids)
             if d and not filters.suppressed(d, cats, words)
-            and (not oldest or (d.get("posted_at") or d.get("first_seen") or 0) >= oldest)
+            and (not oldest_listed or posted(d) >= oldest_listed)
+            and (not oldest_alertable or posted(d) >= oldest_alertable)
         ]
         if not fresh:
             return

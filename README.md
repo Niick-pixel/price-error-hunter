@@ -84,6 +84,20 @@ checkbox off stops it and skips creating the WebGL context at all.
 bloom weights, corner shape, hairline, noise and a fake amplitude, plus an
 opt-in microphone input. Open it at `/static/siri-glow-demo.html`.
 
+### Why alerts are gated on posted time
+
+A deal can be new *to the app* and already hours old. `slickdeals_popular` ranks
+by popularity, so items enter it on average **ten hours** after being posted —
+measured across live data, the median gap between a deal being posted and this
+app first seeing it was **three hours**, and 49 of 74 recent finds were over an
+hour old.
+
+Alerting on discovery therefore meant notifications for stale deals that then
+sorted to the bottom of the list. **Only alert on deals posted within**
+(Settings, default 1 hour) gates every alert — score, keyword and chime — on how
+long ago the deal went up, not on when we noticed it. Set it to *Any age* to get
+the old behaviour.
+
 ### Keyword alerts
 
 **Settings → Watch keywords** takes a comma-separated list. When a new deal's

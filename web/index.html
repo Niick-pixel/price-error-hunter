@@ -159,6 +159,20 @@
         <output id="o-alertscore">75</output>
       </div>
     </div>
+    <div class="setrow" style="margin-top:16px">
+      <label class="setlabel" for="alertage">
+        Only alert on deals posted within
+        <span class="setnote">a deal can be new to us but hours old — the popular feed surfaces items long after they go up</span>
+      </label>
+      <select id="alertage">
+        <option value="30">30 minutes</option>
+        <option value="60">1 hour</option>
+        <option value="120">2 hours</option>
+        <option value="360">6 hours</option>
+        <option value="0">Any age</option>
+      </select>
+    </div>
+
     <p class="sethint">
       Hidden product types never raise an alert, whatever they score.
     </p>

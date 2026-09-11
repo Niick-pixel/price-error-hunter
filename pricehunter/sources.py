@@ -39,6 +39,9 @@ TECHBARGAINS_FEED = "https://www.techbargains.com/rss.xml"
 # TechBargains puts the price at the end of the title: "... Jumper Cables $33.33"
 TRAILING_PRICE = re.compile(r"\$\s?([\d,]+(?:\.\d{2})?)\s*$")
 LEADING_PRICE_TAG = re.compile(r"^\$\s?[\d,]+(?:\.\d{2})?\*?\s*\|\s*")
+# "Amazon - Smlau XB2 Wireless Adapter ..." - en dash or hyphen, short prefix
+# only, so a product name containing a dash is not mistaken for a store.
+TITLE_RETAILER = re.compile(r"^([A-Za-z][A-Za-z0-9'&. ]{2,18}?)\s*[-–—]\s+")
 
 # "Product Name - down 12.45% ($4.12) to $28.98 from $33.10"
 CAMEL_TITLE = re.compile(
@@ -227,6 +230,12 @@ class Slickdeals:
             tag = RETAILER_TAG.search(desc)
             if tag:
                 retailer = tag.group(1).split(".")[0].replace("-", " ").title()
+            else:
+                # The popular feed often omits the [store.com] tag and instead
+                # names the retailer in the title as "Amazon - product name".
+                lead = TITLE_RETAILER.match(title)
+                if lead:
+                    retailer = lead.group(1).strip().title()
 
             # Posts usually spell out the product URL, so Amazon items can join
             # the Amazon tab with a chart and a direct link like any other.

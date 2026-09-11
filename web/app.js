@@ -783,7 +783,8 @@ function applySettings(cfg) {
     $("o-cardglow").textContent = `${cfg.card_glow_discount ?? 50}%`;
     $("cardglowon").checked = cfg.card_glow !== false;
     $("watchwords").value = cfg.watch_keywords || "";
-    $("dealttl").value = String(cfg.deal_ttl_hours ?? 3);
+    $("dealttl").value = String(cfg.deal_ttl_hours ?? 12);
+    $("alertage").value = String(cfg.alert_max_age_minutes ?? 60);
     $("alertscore").value = String(cfg.alert_score ?? 75);
     $("o-alertscore").textContent = String(cfg.alert_score ?? 75);
     GLOW_DISCOUNT = cfg.card_glow_discount ?? 50;
@@ -976,6 +977,7 @@ function saveSettings() {
     exclude_keywords: $("keywords").value,
     watch_keywords: $("watchwords").value,
     deal_ttl_hours: Number($("dealttl").value),
+    alert_max_age_minutes: Number($("alertage").value),
     bg_theme: document.querySelector(".swatch.on")?.dataset.theme || "charcoal",
     card_glow: $("cardglowon").checked,
     card_glow_discount: Number($("cardglow").value),
@@ -1008,7 +1010,7 @@ $("keywords").addEventListener("input", () => {
     load();
   })
 );
-["sound", "interval", "livecheck", "sounddiscount"].forEach((id) =>
+["sound", "interval", "livecheck", "sounddiscount", "alertage"].forEach((id) =>
   $(id).addEventListener("change", saveSettings)
 );
 
