@@ -9,7 +9,7 @@ if not exist ".venv\Scripts\python.exe" (
     ".venv\Scripts\python.exe" -m pip install --quiet -r requirements.txt || goto :fail
 )
 
-".venv\Scripts\python.exe" -m pricehunter
+".venv\Scripts\python.exe" -m glitchguard
 goto :eof
 
 :fail

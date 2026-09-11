@@ -26,7 +26,7 @@ def main():
 
     engine.start()
     url = f"http://127.0.0.1:{port}/?t={server.TOKEN}"
-    print("Price Error Hunter is running.")
+    print("GlitchGuard is running.")
     print(f"  {url}")
     print("Close this window to stop.")
     threading.Timer(0.6, lambda: webbrowser.open(url)).start()

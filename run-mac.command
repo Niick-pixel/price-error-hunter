@@ -1,5 +1,5 @@
 #!/bin/bash
-# Price Error Hunter launcher for macOS and Linux.
+# GlitchGuard launcher for macOS and Linux.
 #
 # The .command extension makes this double-clickable in Finder. If macOS
 # refuses to run it, the file has lost its executable bit - restore it with:
@@ -40,4 +40,4 @@ if [ ! -x "$PY_BIN" ]; then
     "$PY_BIN" -m pip install --quiet -r requirements.txt
 fi
 
-"$PY_BIN" -m pricehunter
+"$PY_BIN" -m glitchguard
