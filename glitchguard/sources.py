@@ -256,6 +256,9 @@ class Slickdeals:
                 "discount_pct": discount or 0.0,
                 "savings": round(list_price - price, 2) if list_price else 0.0,
                 "image": entry["image"] or (amazon_image(asin) if asin else ""),
+                # Kept so promo codes can be detected; Slickdeals puts
+                # "w/ code XXXX" in the description, not the title.
+                "description": desc,
                 "age_text": _age_text(entry["pub_date"]),
                 "asin": asin,
                 "direct_url": f"https://www.amazon.com/dp/{asin}" if asin else "",
@@ -349,6 +352,8 @@ class TechBargains:
                 # The feed carries a real thumbnail on its own CDN; prefer it,
                 # because Amazon's by-ASIN path only has art for books.
                 "image": entry["image"] or (amazon_image(asin) if asin else ""),
+                # Kept so promo codes can be detected later.
+                "description": entry["description"],
                 "age_text": _age_text(entry["pub_date"]),
                 "asin": asin,
                 "direct_url": f"https://www.amazon.com/dp/{asin}" if asin else link,

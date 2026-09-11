@@ -167,7 +167,9 @@ function buildCard(deal) {
     };
     thumb.append(image);
   }
-  const badge = el("span", `badge ${deal.tier || "normal"}`, `${Math.round(deal.score)} · ${TIER_LABEL[deal.tier] || "DEAL"}`);
+  const badge = el("span", `badge ${deal.tier || "normal"}`);
+  badge.append(el("span", "score", String(Math.round(deal.score))));
+  badge.append(el("span", null, TIER_LABEL[deal.tier] || "DEAL"));
   thumb.append(badge);
   if (deal.is_new) thumb.append(el("span", "newflag", "NEW"));
   card.append(thumb);
@@ -188,8 +190,10 @@ function buildCard(deal) {
 
   const meta = el("div", "meta");
   meta.append(el("span", null, deal.age_text || ""));
-  meta.append(el("span", null, deal.savings ? `save ${money(deal.savings)}` : ""));
+  meta.append(el("span", "save", deal.savings ? `save ${money(deal.savings)}` : ""));
   body.append(meta);
+
+  if (deal.promo_code) body.append(buildCopyCode(deal.promo_code));
 
   // Straight to the product, without opening the details first. Sits at the
   // bottom of every card so the row of buttons lines up across the grid.
@@ -245,6 +249,7 @@ function openModal(id) {
   const heading = el("h2", "title", deal.title || "Untitled");
   heading.id = "modaltitle";
   main.append(heading);
+  if (deal.promo_code) main.append(buildCopyCode(deal.promo_code));
   main.append(buildDetail(deal));
   bodyEl.append(main);
 
@@ -346,6 +351,57 @@ function buildDetail(deal) {
 
   wrap.append(actions);
   return wrap;
+}
+
+/* Shown only when a code was actually detected. Clipboard writes can fail -
+   no permission, or an insecure context - so the fallback selects the text in
+   a temporary field and copies that, and the label reports what happened
+   rather than silently doing nothing. */
+function buildCopyCode(code) {
+  const wrap = el("div", "coupon");
+  wrap.append(el("span", "couponlabel", "CODE"));
+  wrap.append(el("code", "couponcode", code));
+
+  const btn = el("button", "couponbtn", "Copy");
+  btn.type = "button";
+  btn.setAttribute("aria-label", `Copy promo code ${code}`);
+  btn.addEventListener("click", async (event) => {
+    // The card opens the detail modal on click; copying must not do that too.
+    event.stopPropagation();
+    const done = await copyText(code);
+    btn.textContent = done ? "Copied!" : "Press ⌘C";
+    wrap.classList.toggle("copied", done);
+    clearTimeout(btn._t);
+    btn._t = setTimeout(() => {
+      btn.textContent = "Copy";
+      wrap.classList.remove("copied");
+    }, 1600);
+  });
+  wrap.append(btn);
+  return wrap;
+}
+
+async function copyText(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {}
+  // Fallback for plain http:// origins, where the async clipboard is blocked.
+  try {
+    const field = document.createElement("textarea");
+    field.value = text;
+    field.setAttribute("readonly", "");
+    field.style.cssText = "position:fixed;top:-1000px;opacity:0;";
+    document.body.append(field);
+    field.select();
+    const ok = document.execCommand("copy");
+    field.remove();
+    return ok;
+  } catch {
+    return false;
+  }
 }
 
 /* Sits behind the image. When no usable artwork exists the card shows this
@@ -468,12 +524,51 @@ const revealer =
       )
     : null;
 
+/* An empty grid usually means a filter is too tight rather than that nothing
+   exists, so the copy names the likely cause instead of just saying "none". */
+function renderEmpty() {
+  const box = $("empty");
+  box.replaceChildren();
+  const mark = el("div", "emptymark");
+  mark.innerHTML =
+    '<svg viewBox="0 0 24 24" width="24" height="24" fill="none">' +
+    '<circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/>' +
+    '<path d="m16.5 16.5 4 4" stroke="currentColor" stroke-width="1.8" ' +
+    'stroke-linecap="round"/></svg>';
+  box.append(mark);
+
+  const tight =
+    Number($("mindiscount").value) > 0 ||
+    ($("keywords").value || "").trim() !== "";
+  box.append(el("h3", null, tight ? "Nothing matches those filters" : "No deals here yet"));
+  box.append(el("p", null, tight
+    ? "Try lowering the minimum discount, or clearing a hidden keyword in Settings."
+    : "GlitchGuard is watching the feeds. New finds appear here the moment they land."));
+}
+
+/* Placeholder cards shaped like real ones, so the first paint has structure
+   and the grid does not jump when the deals arrive. */
+function renderSkeletons(count) {
+  const grid = $("grid");
+  grid.replaceChildren();
+  for (let i = 0; i < count; i++) {
+    const s = el("div", "skel");
+    s.append(el("div", "sk-thumb"));
+    const b = el("div", "sk-body");
+    b.append(el("div", "sk-line short"));
+    b.append(el("div", "sk-line"));
+    b.append(el("div", "sk-line tall"));
+    s.append(b);
+    grid.append(s);
+  }
+}
+
 /* Everything the card paints except the age, which ticks on every poll and is
    patched in place instead of forcing a rebuild. */
 function cardSignature(d) {
   return [
     d.title, d.price, d.list_price, d.discount_pct, d.savings,
-    d.score, d.tier, d.is_new, d.image, d.retailer, d.source,
+    d.score, d.tier, d.is_new, d.image, d.retailer, d.source, d.promo_code,
   ].join("");
 }
 
@@ -527,7 +622,7 @@ function render(deals) {
   scheduleRevealFallback();
 
   $("empty").classList.toggle("hidden", deals.length > 0);
-  if (!deals.length) $("empty").textContent = "No deals match these filters yet.";
+  if (!deals.length) renderEmpty();
 
   const errors = deals.filter((d) => d.tier === "error").length;
   const fresh = deals.filter((d) => d.is_new).length;
@@ -1076,6 +1171,7 @@ async function pollStatus() {
   }
 }
 
+renderSkeletons(8);
 load();
 setInterval(pollStatus, 4000);
 // Safety net in case a change is ever missed; the status poll does the work.

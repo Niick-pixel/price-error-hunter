@@ -168,6 +168,50 @@ def parse_keywords(raw):
     return [w.strip().lower() for w in (raw or "").split(",") if w.strip()]
 
 
+# --- promo codes ----------------------------------------------------------
+#
+# Only fires on an explicit cue - "code", "coupon", "promo" - followed by
+# something code-shaped. Pulling any capitalised token out of a title produces
+# far too many false positives (FREE, NEW, model numbers), and a Copy Code
+# button that copies rubbish is worse than no button at all.
+CODE_PATTERNS = (
+    # "code: SAVE20", "w/ code SAVE20", 'with code "SAVE20"'
+    re.compile(r"\b(?:promo\s+|coupon\s+|discount\s+)?code[:\s]+[\"'“]?"
+               r"([A-Za-z0-9][A-Za-z0-9\-]{3,19})[\"'”]?"),
+    # "use SAVE20 at checkout"
+    re.compile(r"\buse\s+[\"'“]?([A-Za-z0-9][A-Za-z0-9\-]{3,19})"
+               r"[\"'”]?\s+at\s+checkout", re.I),
+    # "coupon SAVE20"
+    re.compile(r"\bcoupon[:\s]+[\"'“]?([A-Za-z0-9][A-Za-z0-9\-]{3,19})"
+               r"[\"'”]?"),
+)
+
+# Words that legitimately follow "code" in prose but are not codes.
+CODE_STOPWORDS = {
+    "AT", "FOR", "THE", "AND", "WITH", "FROM", "THIS", "YOUR", "WHEN", "ONLY",
+    "OFF", "FREE", "SHIP", "SHIPPING", "PRIME", "REQUIRED", "APPLIED", "CLIP",
+    "CHECKOUT", "AUTO", "NEEDED", "WORKS", "ABOVE", "BELOW", "APPLY", "REDEEM",
+}
+
+
+def find_promo_code(*texts):
+    """Return the first promo code found in the given strings, or ''."""
+    for text in texts:
+        if not text:
+            continue
+        for pattern in CODE_PATTERNS:
+            for match in pattern.finditer(text):
+                code = match.group(1).strip().strip("-").upper()
+                if code in CODE_STOPWORDS or len(code) < 4:
+                    continue
+                # Real codes mix letters and digits. A pure-letter run is only
+                # accepted when it is long enough to be implausible as prose.
+                if not any(ch.isdigit() for ch in code) and len(code) < 6:
+                    continue
+                return code
+    return ""
+
+
 def watch_match(deal, keywords):
     """Return the first watch keyword this deal matches, or ''.
 

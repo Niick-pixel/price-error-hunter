@@ -20,16 +20,54 @@
   /* Ink for the placeholder tile and for body prose, both of which sit on
      surfaces that flip with the theme. */
   --thumb-ink: rgba(255, 255, 255, .30);
-  --prose: #c4cede;
-  --text: #f2f4f7;
-  /* Lifted from #86868b, which failed contrast on this lighter background. */
-  --muted: #a2a9b4;
-  --brand: #ff7a18;
-  --error: #ff453a;
-  --strong: #ffd60a;
-  --ok: #30d158;
+  --prose: #c3cbdd;
+  --text: #f4f6fb;
+  --muted: #99a3bb;
+
+  /* GlitchGuard identity: deep indigo carries the brand, electric cyan marks
+     anything live or confirmed, soft coral is reserved for the one thing that
+     matters most - a suspected pricing mistake. Keeping coral scarce is what
+     makes it register instantly in a grid of 150 cards. */
+  --indigo: #5b6cff;
+  --indigo-deep: #3b46c4;
+  --cyan: #22d3ee;
+  --coral: #ff6b5e;
+  --amber: #f5b544;
+
+  /* Fill colours and text colours cannot be the same value. The indigo that
+     looks right as a button reaches only 3.71:1 as small label text on this
+     background, so labels use a lifted variant while fills keep the brand hue.
+     Every pairing here is measured, not eyeballed. */
+  --indigo-text: #98a4ff;
+  --cyan-text: #4fdcf0;
+
+  --brand: var(--indigo);
+  --error: var(--coral);
+  --strong: var(--amber);
+  --ok: #34d399;
+
+  /* Type scale, 1.25 ratio, and a numeric font feature set so prices align in
+     a column and never jitter as they tick over. */
+  --fs-micro: 10.5px;
+  --fs-small: 12px;
+  --fs-body: 13.5px;
+  --fs-title: 14.5px;
+  --fs-price: 21px;
+  --fs-h1: 19px;
+  --tracking-tight: -.022em;
+  --tracking-wide: .09em;
+
+  /* One spacing rhythm instead of ad-hoc pixel values per component. */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 22px;
+  --s6: 30px;
+
   --radius: 18px;
   --radius-lg: 24px;
+  --radius-pill: 980px;
 
   /* Apple leans on a gentle overshoot for motion and a long, soft ease for
      anything that travels a distance. */
@@ -47,19 +85,28 @@ html[data-mode="light"] {
   --border: rgba(15, 23, 42, .10);
   --border-strong: rgba(15, 23, 42, .20);
   --glass-edge: rgba(255, 255, 255, .85);
-  --shadow-soft: 0 14px 34px rgba(15, 23, 42, .10);
-  --shadow-lift: 0 20px 44px rgba(15, 23, 42, .16);
+  --shadow-soft: 0 14px 34px rgba(23, 27, 56, .10);
+  --shadow-lift: 0 20px 44px rgba(23, 27, 56, .16);
   --thumb-bg: #fff;
   --thumb-ink: rgba(15, 23, 42, .34);
-  --prose: #334155;
-  --text: #111726;
-  --muted: #5a6474;
-  /* Darker than the dark-theme orange: #e8590c only reaches 3.16 against a
-     pale ground, short of the 4.5 needed for the small retailer label. This
-     also improves the white-on-orange quicklink. */
-  --brand: #a83f06;
-  --error: #b42318;
-  --strong: #92400e;
+  --prose: #3d4658;
+  --text: #12162a;
+  --muted: #5a6379;
+  /* The same identity taken down in lightness. The dark-theme indigo and coral
+     only reach about 3:1 on a pale ground, short of the 4.5 small text needs,
+     so each accent is darkened rather than swapped for a different hue. */
+  --indigo: #3f4bd8;
+  --indigo-deep: #2d35a8;
+  --cyan: #0b7c8c;
+  --coral: #c43a2f;
+  --amber: #8a5a08;
+  /* Darkened for text on a pale ground; the fill cyan reaches only 4.34:1. */
+  --indigo-text: #3a45c9;
+  --cyan-text: #076370;
+
+  --brand: var(--indigo);
+  --error: var(--coral);
+  --strong: var(--amber);
   --ok: #046c4e;
   color-scheme: light;
 }
@@ -78,9 +125,11 @@ html {
 body {
   margin: 0;
   background-color: var(--bg);
+  /* Two faint washes in the brand hues, indigo left and cyan right, so the
+     page has depth without a visible gradient band. */
   background-image:
-    radial-gradient(900px 520px at 12% -8%, rgba(255, 122, 24, .10) 0%, transparent 60%),
-    radial-gradient(760px 480px at 88% 0%, rgba(10, 132, 255, .09) 0%, transparent 62%);
+    radial-gradient(900px 520px at 12% -8%, rgba(91, 108, 255, .13) 0%, transparent 60%),
+    radial-gradient(760px 480px at 88% 0%, rgba(34, 211, 238, .07) 0%, transparent 62%);
   background-attachment: fixed;
   color: var(--text);
   font: 15px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI",
@@ -132,9 +181,10 @@ body {
   width: 40px; height: 40px;
   display: grid; place-items: center;
   border-radius: 12px;
-  background: linear-gradient(135deg, var(--brand), #ff3d3d);
+  background: linear-gradient(135deg, var(--indigo), var(--indigo-deep));
+  color: #fff;
   font-size: 19px;
-  box-shadow: 0 8px 24px rgba(255, 122, 24, .34);
+  box-shadow: 0 8px 24px rgba(91, 108, 255, .38);
   transition: transform .5s var(--spring);
 }
 .brand:hover .logo { transform: scale(1.08) rotate(-4deg); }
@@ -575,7 +625,7 @@ body.modal-open { overflow: hidden; }
   font-weight: 700;
   letter-spacing: .08em;
   text-transform: uppercase;
-  color: var(--brand);
+  color: var(--indigo-text);
   margin-bottom: 3px;
 }
 .alerttitle {
@@ -621,7 +671,67 @@ body.modal-open { overflow: hidden; }
 .card .body { flex: 1; display: flex; flex-direction: column; }
 .card .meta { margin-top: auto; }
 
-.empty { text-align: center; color: var(--muted); padding: 70px 30px; font-size: 15px; }
+/* Empty state: says what is happening and what to try, rather than a bare
+   line of grey text. */
+.empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 76px 30px;
+  color: var(--muted);
+}
+.empty .emptymark {
+  width: 54px; height: 54px;
+  margin: 0 auto var(--s4);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--indigo);
+}
+.empty h3 {
+  margin: 0 0 var(--s2);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: var(--tracking-tight);
+}
+.empty p { margin: 0 auto; max-width: 34ch; font-size: var(--fs-body); line-height: 1.6; }
+
+/* Skeletons. Shaped like the real card so the layout does not jump when deals
+   arrive, and the shimmer is a transform so it stays on the compositor. */
+.skel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  overflow: hidden;
+  min-height: 330px;
+}
+.skel .sk-thumb { height: 172px; background: var(--panel-2); }
+.skel .sk-body { padding: var(--s4); display: flex; flex-direction: column; gap: var(--s3); }
+.skel .sk-line { height: 10px; border-radius: 6px; background: var(--panel-2); }
+.skel .sk-line.short { width: 42%; }
+.skel .sk-line.tall { height: 20px; width: 58%; }
+
+.skel .sk-thumb,
+.skel .sk-line {
+  position: relative;
+  overflow: hidden;
+}
+.skel .sk-thumb::after,
+.skel .sk-line::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, var(--glass-edge), transparent);
+  animation: shimmer 1.5s var(--ease) infinite;
+}
+@keyframes shimmer { to { transform: translateX(100%); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .skel .sk-thumb::after, .skel .sk-line::after { animation: none; }
+}
 
 .card {
   position: relative;
@@ -713,40 +823,40 @@ body.modal-open { overflow: hidden; }
   animation: cardAurora 9s linear infinite;
 }
 
+/* Calmer than before: three hues from the brand palette instead of four
+   unrelated neons, lower opacity, and a 14s lap rather than 9s. The effect
+   should read as the card being lit from behind, not as a light show - at 150
+   cards, anything stronger becomes noise and stops meaning anything. */
 @keyframes cardAurora {
   0%, 100% {
-    box-shadow: -20px -14px 38px -6px rgba(255,  45, 149, .55),
-                 20px -14px 38px -6px rgba(255, 138,  61, .50),
-                 20px  18px 42px -6px rgba( 34, 211, 238, .50),
-                -20px  18px 42px -6px rgba(123,  92, 255, .52);
+    box-shadow: -18px -12px 34px -10px rgba( 91, 108, 255, .42),
+                 18px -12px 34px -10px rgba( 34, 211, 238, .34),
+                 18px  16px 38px -10px rgba(255, 107,  94, .32),
+                -18px  16px 38px -10px rgba( 91, 108, 255, .30);
   }
-  25% {
-    box-shadow: -20px -14px 38px -6px rgba(123,  92, 255, .52),
-                 20px -14px 38px -6px rgba(255,  45, 149, .55),
-                 20px  18px 42px -6px rgba(255, 138,  61, .50),
-                -20px  18px 42px -6px rgba( 34, 211, 238, .50);
+  33% {
+    box-shadow: -18px -12px 34px -10px rgba(255, 107,  94, .32),
+                 18px -12px 34px -10px rgba( 91, 108, 255, .42),
+                 18px  16px 38px -10px rgba( 34, 211, 238, .34),
+                -18px  16px 38px -10px rgba(255, 107,  94, .30);
   }
-  50% {
-    box-shadow: -20px -14px 38px -6px rgba( 34, 211, 238, .50),
-                 20px -14px 38px -6px rgba(123,  92, 255, .52),
-                 20px  18px 42px -6px rgba(255,  45, 149, .55),
-                -20px  18px 42px -6px rgba(255, 138,  61, .50);
-  }
-  75% {
-    box-shadow: -20px -14px 38px -6px rgba(255, 138,  61, .50),
-                 20px -14px 38px -6px rgba( 34, 211, 238, .50),
-                 20px  18px 42px -6px rgba(123,  92, 255, .52),
-                -20px  18px 42px -6px rgba(255,  45, 149, .55);
+  66% {
+    box-shadow: -18px -12px 34px -10px rgba( 34, 211, 238, .34),
+                 18px -12px 34px -10px rgba(255, 107,  94, .32),
+                 18px  16px 38px -10px rgba( 91, 108, 255, .42),
+                -18px  16px 38px -10px rgba( 34, 211, 238, .30);
   }
 }
 
-/* Hover adds the depth shadow underneath the same four hues. */
+.card.glow { animation-duration: 14s; }
+
+/* Hover lifts the bloom a little rather than switching to a different look. */
 .card.glow:hover {
-  box-shadow: 0 22px 50px rgba(0, 0, 0, .55),
-              -22px -16px 46px -4px rgba(255,  45, 149, .70),
-               22px -16px 46px -4px rgba(255, 138,  61, .62),
-               22px  20px 50px -4px rgba( 34, 211, 238, .62),
-              -22px  20px 50px -4px rgba(123,  92, 255, .66);
+  box-shadow: var(--shadow-lift),
+              -20px -14px 40px -8px rgba( 91, 108, 255, .58),
+               20px -14px 40px -8px rgba( 34, 211, 238, .48),
+               20px  18px 44px -8px rgba(255, 107,  94, .44),
+              -20px  18px 44px -8px rgba( 91, 108, 255, .42);
   animation: none;
 }
 
@@ -772,38 +882,32 @@ html[data-mode="light"] .card.glow {
 
 @keyframes cardAuroraLight {
   0%, 100% {
-    box-shadow: -18px -12px 30px -8px rgba(190,  24, 120, .55),
-                 18px -12px 30px -8px rgba(194,  65,  12, .50),
-                 18px  16px 34px -8px rgba(  6, 110, 140, .50),
-                -18px  16px 34px -8px rgba( 67,  56, 202, .52);
+    box-shadow: -16px -10px 28px -10px rgba( 63,  75, 216, .42),
+                 16px -10px 28px -10px rgba( 11, 124, 140, .36),
+                 16px  14px 32px -10px rgba(196,  58,  47, .32),
+                -16px  14px 32px -10px rgba( 63,  75, 216, .30);
   }
-  25% {
-    box-shadow: -18px -12px 30px -8px rgba( 67,  56, 202, .52),
-                 18px -12px 30px -8px rgba(190,  24, 120, .55),
-                 18px  16px 34px -8px rgba(194,  65,  12, .50),
-                -18px  16px 34px -8px rgba(  6, 110, 140, .50);
+  33% {
+    box-shadow: -16px -10px 28px -10px rgba(196,  58,  47, .32),
+                 16px -10px 28px -10px rgba( 63,  75, 216, .42),
+                 16px  14px 32px -10px rgba( 11, 124, 140, .36),
+                -16px  14px 32px -10px rgba(196,  58,  47, .30);
   }
-  50% {
-    box-shadow: -18px -12px 30px -8px rgba(  6, 110, 140, .50),
-                 18px -12px 30px -8px rgba( 67,  56, 202, .52),
-                 18px  16px 34px -8px rgba(190,  24, 120, .55),
-                -18px  16px 34px -8px rgba(194,  65,  12, .50);
-  }
-  75% {
-    box-shadow: -18px -12px 30px -8px rgba(194,  65,  12, .50),
-                 18px -12px 30px -8px rgba(  6, 110, 140, .50),
-                 18px  16px 34px -8px rgba( 67,  56, 202, .52),
-                -18px  16px 34px -8px rgba(190,  24, 120, .55);
+  66% {
+    box-shadow: -16px -10px 28px -10px rgba( 11, 124, 140, .36),
+                 16px -10px 28px -10px rgba(196,  58,  47, .32),
+                 16px  14px 32px -10px rgba( 63,  75, 216, .42),
+                -16px  14px 32px -10px rgba( 11, 124, 140, .30);
   }
 }
 
 html[data-mode="light"] .card.glow:hover {
   animation: none;
   box-shadow: var(--shadow-lift),
-              -20px -14px 36px -6px rgba(190,  24, 120, .68),
-               20px -14px 36px -6px rgba(194,  65,  12, .60),
-               20px  18px 40px -6px rgba(  6, 110, 140, .60),
-              -20px  18px 40px -6px rgba( 67,  56, 202, .64);
+              -18px -12px 32px -8px rgba( 63,  75, 216, .50),
+               18px -12px 32px -8px rgba( 11, 124, 140, .44),
+               18px  16px 36px -8px rgba(196,  58,  47, .40),
+              -18px  16px 36px -8px rgba( 63,  75, 216, .38);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -825,33 +929,76 @@ html[data-mode="light"] .card.glow:hover {
   padding: 10px;
 }
 
+/* Only the top tier is loud. A grid where every badge shouts has no hierarchy,
+   so "normal" is a quiet glass chip, "strong" is a restrained tint, and solid
+   coral is spent exclusively on a suspected pricing mistake. */
 .badge {
   position: absolute;
-  top: 9px; right: 9px;
-  padding: 4px 9px;
-  border-radius: 7px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: .4px;
-  color: #fff;
+  top: var(--s3); right: var(--s3);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-micro);
+  font-weight: 650;
+  letter-spacing: .04em;
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
 }
-.badge.error  { background: linear-gradient(135deg, #ff2d55, #ff4d5e); }
-.badge.strong { background: linear-gradient(135deg, #f5a524, #ff7a18); }
-.badge.normal { background: #3b4a5c; }
+
+.badge .score {
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+}
+
+.badge.normal {
+  background: rgba(10, 14, 30, .55);
+  color: var(--text);
+  border: 1px solid var(--glass-edge);
+}
+.badge.strong {
+  background: rgba(245, 181, 68, .16);
+  color: var(--amber);
+  border: 1px solid rgba(245, 181, 68, .42);
+}
+.badge.error {
+  background: linear-gradient(135deg, var(--coral), #ff4f7e);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, .22);
+  box-shadow: 0 6px 18px -4px rgba(255, 107, 94, .55);
+}
+
+html[data-mode="light"] .badge.normal {
+  background: rgba(255, 255, 255, .82);
+  color: var(--text);
+  border-color: rgba(15, 23, 42, .12);
+}
+html[data-mode="light"] .badge.strong {
+  background: rgba(138, 90, 8, .10);
+  border-color: rgba(138, 90, 8, .32);
+}
 
 .newflag {
   position: absolute;
-  top: 9px; left: 9px;
-  background: var(--ok);
-  color: #06231a;
-  font-size: 10px;
-  font-weight: 800;
-  padding: 3px 7px;
-  border-radius: 6px;
-  letter-spacing: .5px;
+  top: var(--s3); left: var(--s3);
+  background: rgba(34, 211, 238, .16);
+  color: var(--cyan-text);
+  border: 1px solid rgba(34, 211, 238, .45);
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: var(--radius-pill);
+  letter-spacing: var(--tracking-wide);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+html[data-mode="light"] .newflag {
+  background: rgba(11, 124, 140, .10);
+  border-color: rgba(11, 124, 140, .34);
 }
 
-.body { padding: 13px 14px 15px; }
+.body { padding: var(--s4) var(--s4) var(--s4); }
 
 .retailerline {
   display: flex;
@@ -865,7 +1012,7 @@ html[data-mode="light"] .card.glow:hover {
   font-weight: 700;
   letter-spacing: .7px;
   text-transform: uppercase;
-  color: var(--brand);
+  color: var(--indigo-text);
 }
 
 .srctag {
@@ -890,12 +1037,55 @@ html[data-mode="light"] .card.glow:hover {
 }
 .card.open .title { -webkit-line-clamp: unset; font-size: 17px; }
 
-.prices { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; }
-.now { font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.was { font-size: 13px; color: var(--muted); text-decoration: line-through; }
-.off { font-size: 12px; font-weight: 700; color: var(--ok); }
+/* Reading order is price, then how far it fell, then what it was. The discount
+   is a chip rather than loose text so the eye lands on it without having to
+   parse a line of numbers. */
+.prices {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2);
+  flex-wrap: wrap;
+  margin-top: var(--s3);
+}
+.now {
+  font-size: var(--fs-price);
+  font-weight: 700;
+  letter-spacing: var(--tracking-tight);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.was {
+  font-size: var(--fs-small);
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  font-variant-numeric: tabular-nums;
+}
+.off {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ok);
+  background: rgba(52, 211, 153, .14);
+  border: 1px solid rgba(52, 211, 153, .34);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-variant-numeric: tabular-nums;
+}
+html[data-mode="light"] .off {
+  background: rgba(4, 108, 78, .10);
+  border-color: rgba(4, 108, 78, .30);
+}
 
-.meta { margin-top: 9px; font-size: 11.5px; color: var(--muted); display: flex; justify-content: space-between; }
+.meta {
+  margin-top: var(--s3);
+  font-size: 11px;
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s2);
+  font-variant-numeric: tabular-nums;
+}
+.meta .save { color: var(--cyan-text); font-weight: 600; }
 
 /* ---------- expanded detail ---------- */
 .detail { border-top: 1px solid var(--border); margin-top: 13px; padding-top: 14px; }
@@ -979,26 +1169,89 @@ html[data-mode="light"] .card.glow:hover {
 .chartwrap img { display: block; width: 100%; height: auto; }
 .chartcap { font-size: 11px; color: var(--muted); margin: 0 0 10px; }
 
+/* Promo code. Cyan marks it as actionable and distinct from the coral used
+   for a suspected pricing error, and the code itself is monospace so lookalike
+   characters can be told apart before pasting. */
+.coupon {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  margin-top: var(--s3);
+  padding: 7px 8px 7px 10px;
+  border-radius: 11px;
+  background: rgba(34, 211, 238, .09);
+  border: 1px dashed rgba(34, 211, 238, .45);
+  transition: background .3s var(--ease), border-color .3s var(--ease);
+}
+html[data-mode="light"] .coupon {
+  background: rgba(11, 124, 140, .07);
+  border-color: rgba(11, 124, 140, .38);
+}
+.coupon.copied {
+  background: rgba(52, 211, 153, .13);
+  border-color: rgba(52, 211, 153, .5);
+  border-style: solid;
+}
+
+.couponlabel {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: var(--tracking-wide);
+  color: var(--cyan-text);
+  flex-shrink: 0;
+}
+.couponcode {
+  flex: 1;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: var(--fs-small);
+  font-weight: 600;
+  letter-spacing: .04em;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.couponbtn {
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 5px 12px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+  color: #04222a;
+  background: var(--cyan);
+  transition: transform .3s var(--spring), filter .2s var(--ease);
+}
+html[data-mode="light"] .couponbtn { color: #fff; }
+.couponbtn:hover { filter: brightness(1.08); }
+.couponbtn:active { transform: scale(.94); }
+
 /* Quicklink: straight to the retailer without opening details first. */
 .quicklink {
   display: block;
   margin-top: 12px;
   padding: 9px 12px;
   border-radius: 10px;
-  background: linear-gradient(135deg, var(--brand), #ff5f2e);
+  /* Indigo into a deeper indigo rather than the old orange, which now fights
+     the palette. Coral is deliberately not used here - it is reserved for the
+     price-error badge so it keeps its meaning. */
+  background: linear-gradient(135deg, var(--indigo), var(--indigo-deep));
   color: #fff;
-  font-size: 12.5px;
+  font-size: var(--fs-small);
   font-weight: 600;
   text-align: center;
   text-decoration: none;
-  letter-spacing: -.01em;
+  letter-spacing: -.005em;
   transition: transform .3s var(--spring), filter .25s var(--ease),
               box-shadow .3s var(--ease);
 }
 .quicklink:hover {
-  filter: brightness(1.1);
+  filter: brightness(1.12);
   transform: translateY(-1px);
-  box-shadow: 0 8px 20px -6px rgba(255, 122, 24, .7);
+  box-shadow: 0 8px 22px -6px rgba(91, 108, 255, .62);
 }
 .quicklink:active { transform: scale(.97); }
 

@@ -42,6 +42,7 @@ MIGRATIONS = (
     ("posted_at", "REAL"),
     ("category", "TEXT"),
     ("hidden", "INTEGER DEFAULT 0"),
+    ("promo_code", "TEXT"),
     ("direct_url", "TEXT"),
     ("asin", "TEXT"),
     ("amz_price", "REAL"),
@@ -146,14 +147,20 @@ def upsert_listing(items, source="hiddenclearances"):
             db.execute(
                 "INSERT INTO deals (id, url, title, retailer, price, list_price,"
                 " discount_pct, savings, image, age_text, first_seen, last_seen,"
-                " posted_at, category, source, asin, direct_url, detail_state)"
-                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                " posted_at, category, description, promo_code,"
+                " source, asin, direct_url, detail_state)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     item["id"], item["url"], item["title"], item["retailer"],
                     item["price"], item["list_price"], item["discount_pct"],
                     item["savings"], item["image"], item["age_text"], now, now,
                     _posted_at(item.get("age_text"), now),
                     filters.classify(item),
+                    # Feed descriptions are where promo codes live, so both the
+                    # text and the extracted code are stored at ingest.
+                    item.get("description", ""),
+                    filters.find_promo_code(item.get("title"),
+                                            item.get("description")),
                     source, item.get("asin", ""), item.get("direct_url", ""),
                     # Feed sources already carry everything; skip the detail fetch.
                     item.get("detail_state", 0),
@@ -167,6 +174,8 @@ def upsert_listing(items, source="hiddenclearances"):
                 "UPDATE deals SET url=?, title=?, retailer=?, price=?, list_price=?,"
                 " discount_pct=?, savings=?, image=?, age_text=?, last_seen=?, gone=0,"
                 " posted_at=COALESCE(posted_at, ?), category=?,"
+                " description=COALESCE(NULLIF(?, ''), description),"
+                " promo_code=COALESCE(NULLIF(?, ''), promo_code),"
                 " prev_price=COALESCE(?, prev_price) WHERE id=?",
                 (
                     item["url"], item["title"], item["retailer"], item["price"],
@@ -178,6 +187,11 @@ def upsert_listing(items, source="hiddenclearances"):
                     # Recomputed every refresh so rows classified under older
                     # rules pick up improvements instead of staying stale.
                     filters.classify(item),
+                    # Never blank an existing description: hiddenclearances
+                    # fills it in later from its detail page.
+                    item.get("description", "") or "",
+                    filters.find_promo_code(item.get("title"),
+                                            item.get("description")) or "",
                     prev, item["id"],
                 ),
             )
@@ -418,4 +432,11 @@ def _to_dict(row):
     # posted_at is fixed when a deal is first seen, so the label, the sort and
     # the age cutoff all read from it and cannot disagree.
     data["age_text"] = age_label(data.get("posted_at")) or data.get("age_text") or ""
+    # Detected on read as well as at ingest, so rows stored before promo codes
+    # existed - and hiddenclearances rows whose description only arrives with
+    # the later detail fetch - pick one up without needing a re-import.
+    if not data.get("promo_code"):
+        data["promo_code"] = filters.find_promo_code(
+            data.get("title"), data.get("description")
+        )
     return data
