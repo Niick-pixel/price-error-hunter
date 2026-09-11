@@ -1,8 +1,15 @@
-# Price Error Hunter
+# GlitchGuard
+
+**Catch real pricing mistakes before they vanish.**
 
 A desktop tool for **Windows and macOS** that watches several public deal feeds
 and surfaces the ones that look like genuine **pricing mistakes** rather than
 ordinary sales.
+
+It is local-first and account-free: everything runs on your own machine, there
+is nothing to sign up for, and no data leaves the computer except the feed
+requests themselves — plus, if you turn them on, the alerts you choose to send
+to your own Discord or Telegram.
 
 ## Running it
 
@@ -35,6 +42,12 @@ When a newly found deal scores at or above the alert threshold, a notification
 card slides in at the bottom right showing the product image, price and
 discount. **Clicking it opens the deal**; the × dismisses it.
 
+The card carries its own opaque surface rather than being glass. It is the one
+element that can land anywhere on the page — most often straight over a white
+product photo — and as a translucent panel it took its contrast from whatever
+happened to be behind it, dropping the title to around 1.4:1. Opaque, it reads
+the same wherever it lands.
+
 The sound is a soft two-note chime generated in the browser with WebAudio.
 Earlier versions called `winsound.MessageBeep`, which played the Windows
 *exclamation* sound — an error noise for something that is good news. Browsers
@@ -47,19 +60,46 @@ tab is in the background.
 
 ### The glow
 
-Any deal at **50% off or more** is backlit with the same palette as the
-full-screen overlay: magenta, coral, indigo and cyan blooming behind the card
-and slowly trading corners over a 9s lap, so the strongest finds are obvious
-while scrolling without needing another badge. It is light behind the card, not
-an outline.
+Any deal at **50% off or more** (adjustable) is lit with magenta, coral, indigo
+and cyan blooming behind the card and slowly trading corners, so the strongest
+finds are obvious while scrolling without needing another badge.
 
-Four offset coloured `box-shadow`s rather than a blurred pseudo-element, for
-two reasons: `.card` sets `overflow: hidden` for the image zoom, which would
-clip a child, and a negative z-index child paints *over* the parent's own
-background rather than behind it. A shadow paints strictly outside the border
-box, so it reads as a backlight with no clipping workaround and no stray edge.
-Under `prefers-reduced-motion` the rotation stops and a static four-hue halo
-remains. The threshold is `GLOW_DISCOUNT` at the top of `web/app.js`.
+The light falls on the front of the card as well as behind it — four corner
+blooms inside the border box, screened over the surface in dark mode and
+multiplied into it in light — so a card reads as lit rather than outlined. The
+wash sits underneath the thumbnail and the body, which are lifted a stacking
+level, so it tints the card surface and never the title or the price.
+
+Behind the card it is four offset coloured `box-shadow`s rather than a blurred
+pseudo-element, for two reasons: `.card` sets `overflow: hidden` for the image
+zoom, which would clip a child, and a negative z-index child paints *over* the
+parent's own background rather than behind it. A shadow paints strictly outside
+the border box, so it reads as a backlight with no clipping workaround and no
+stray edge.
+
+Two settings control it, under **Appearance**:
+
+| Setting | What it does |
+|---|---|
+| **Glow strength** | 0–100, moving alpha, offset, blur and spread together |
+| **Glow colour** | the rainbow preset, or a single colour of your choosing |
+
+Strength moves all four values at once on purpose. Raising alpha by itself only
+hardens the edge — a light that reads as brighter has to spread further at the
+same time.
+
+Choosing a single colour writes that one hue into all four corners, which
+stills the rotation and gives one steady light instead of a cycle. Switching
+back to rainbow *clears* those overrides rather than writing the dark-theme
+hues back, so light mode keeps its own darker, more saturated set: a bright
+halo is invisible on a pale ground, and what works there is coloured shade
+rather than coloured light.
+
+Every length and colour in the animation comes from a custom property, which is
+what makes both settings possible without a second set of keyframes — the
+animation only ever rotates which variable lands on which corner. Under
+`prefers-reduced-motion` the rotation is paused and a static four-hue halo
+remains.
 
 ### Screen glow
 
@@ -113,6 +153,28 @@ Hidden product types still win. Watching `airpods` will not resurface something
 excluded by category or by the hide list — the same `filters.suppressed` gate
 applies first.
 
+### Pinned products
+
+**Settings → Watching → Pinned products** takes a list of ASINs or product
+links, one per line. Paste whatever you have to hand — a bare `B0CV6WWPG2` or a
+full `https://www.amazon.com/dp/...` link — and the ASIN is pulled out of it.
+
+A pinned product **ignores the score and age gates entirely**. Asking for
+something by name is the strongest signal in the app, stronger even than a watch
+keyword, so a pinned find alerts whatever it scores and however long ago it was
+posted, and it sorts to the top. The priority chain is:
+
+    pinned product  >  watch keyword  >  score threshold
+
+One find never makes two sounds: whichever rung claims a deal, the ones below it
+skip it.
+
+A pasted link yields its ASIN *and* is kept as a URL fragment, because the two
+match different fields — a deal can carry a `direct_url` without a parsed ASIN,
+and matching on only one of them silently misses it.
+
+Hidden product types still win here too, the same way they do for keywords.
+
 ### Chime at — sound without the interruption
 
 **Chime at** in the toolbar is a second, quieter trigger: pick a discount
@@ -124,10 +186,38 @@ The two triggers do not double up. A deal that already raised the visual alert
 is excluded from the chime pass, so it never sounds twice for the same find.
 Both respect the **Sound alert** checkbox, and neither fires on first load.
 
+### Sending alerts elsewhere
+
+**Settings → Send alerts elsewhere** can forward an alert to a **Discord**
+channel or a **Telegram** chat, so a find still reaches you when you are not at
+the machine. Both are optional and **off unless a destination is filled in**.
+
+Only finds that already cleared the in-app gates are ever sent — turning this on
+does not forward the whole feed to a chat channel. **Send a test message**
+proves a destination before you rely on it, and reports the service's own error
+text when it fails, since a wrong Telegram chat ID and a revoked token both come
+back as a bare `400` otherwise.
+
+| Destination | What you need |
+|---|---|
+| **Discord** | a webhook URL: channel settings → integrations → webhooks |
+| **Telegram** | a bot token from `@BotFather`, plus your chat ID |
+
+Sends happen on a background thread, so a slow or unreachable webhook can never
+stall polling, and failures surface in the status line rather than raising.
+
+> **Note on Discord:** a webhook is outbound only. It can post into a channel
+> but cannot read one, so "watch a Discord server for deals" is a different
+> feature needing a bot token and server permission. It is deliberately not
+> attempted here.
+
+Credentials are stored in `data/settings.json` on your machine, which is
+gitignored, and are never sent anywhere except the service you configured.
+
 ## Where deals come from
 
-Three public feeds are polled, each costing one request per cycle. A failing feed
-never stops the others, and each source only ever expires its own deals.
+Seven public feeds are polled, each costing one request per cycle. A failing
+feed never stops the others, and each source only ever expires its own deals.
 
 | Source | What it adds |
 |---|---|
@@ -137,6 +227,7 @@ never stops the others, and each source only ever expires its own deals.
 | **Slickdeals popular** | Runs deeper than the front page and only partly overlaps it |
 | **TechBargains** | Amazon-heavy; its links are already product URLs, so ASINs come free |
 | **Woot** | Woot deals via Slickdeals' search feed, since Woot's own RSS is retired |
+| **Walmart** | Walmart deals, gathered the same way |
 
 Together they bring in around 150 live deals per cycle.
 
@@ -165,13 +256,22 @@ legitimately and far more reliably.
 
 The **Settings** tab holds everything that is set once and forgotten:
 
-- **Appearance** — nine themes, six dark and three light, the discount at which
-  cards get the aurora glow, and a switch to turn that glow off.
-- **Alerts** — the score a find must reach to raise a notification card.
+- **Appearance** — eight warm themes, five dark and three light; the discount
+  at which cards get the glow; glow strength; glow colour; and a switch to turn
+  the glow off.
+- **When to alert** — the two independent gates: the score a find must reach,
+  and how recently it must have been posted.
+- **Watching** — watch keywords and the pinned product list.
+- **What to show** — the maximum age of a listed deal.
+- **Send alerts elsewhere** — Discord webhook and Telegram bot, both optional
+  and both off unless filled in.
 - **Deal sources** — all seven feeds, individually switchable. Turning one off
   stops polling it on the next cycle.
-- **Hide deals older than** — the maximum age of a listed deal.
 - **Hidden product types** — the category pills and keyword box.
+
+Each group carries a sentence saying what it is for, because several of these
+only make sense in relation to each other — the two alert gates in particular
+are useless to reason about separately.
 
 The toolbar keeps only what changes often, ordered dropdowns first and
 checkboxes last: min discount, sort, poll interval, chime threshold, then sound
@@ -245,7 +345,7 @@ disagree.
 
 The tabs at the top split the app in two:
 
-- **Deals Feed** — everything all five feeds are carrying.
+- **Deals Feed** — everything all seven feeds are carrying.
 - **Amazon** — only deals that resolve to an Amazon product, each with its ASIN,
   a direct product link, and a real Amazon price-history chart.
 - **Woot** — Woot deals gathered from every source, not just the Woot feed.
@@ -345,7 +445,7 @@ uses the API automatically and the scraper is not used at all.
 **Keepa** sells API access directly — no website, no affiliate account, no sales
 requirement. It is **€49/month minimum with no free tier**, which is poor value
 for personal use, but it is the only route to hard numeric Amazon pricing without
-a public platform. The client is isolated in `pricehunter/creators.py`, so Keepa
+a public platform. The client is isolated in `glitchguard/creators.py`, so Keepa
 can be dropped in behind the same interface if that ever becomes worthwhile.
 
 ### Adding them
@@ -400,10 +500,6 @@ Both endpoints were verified live: the token endpoint returns `invalid_client`
 and the catalog endpoint returns `InvalidToken` for dummy credentials, confirming
 the host, path, headers and request bodies are all correct.
 
-A paid alternative is **Keepa**, which also exposes historical data through a
-proper API. The client is isolated in `pricehunter/creators.py`, so it can be
-swapped behind the same interface.
-
 ## What you see
 
 Every deal is a card showing the retailer, current price, list price and discount.
@@ -421,6 +517,25 @@ and an **Open on … →** button that goes straight to the live product page in
 browser, where you can confirm the real price yourself.
 
 Filter by minimum discount, and sort by score, recency, discount or saving.
+
+## Promo codes
+
+Plenty of deals need a code at checkout, and a deal whose code you never saw is
+not a deal. When one is detected the card grows a **Copy Code** button, on the
+card itself and again in the expanded detail; clicking it copies the code and
+the button confirms with **Copied!**. Copying does not open the deal — the click
+stops there.
+
+**The button only appears when a code was actually found.** Detection fires only
+on an explicit cue — `code:`, `coupon`, `promo`, `use … at checkout` — followed
+by something code-shaped, and a stopword list throws out the words that
+legitimately follow "code" in prose (`at`, `for`, `required`, `checkout`, …).
+A pure-letter run has to be at least six characters to be accepted, since real
+codes almost always mix letters and digits.
+
+That is deliberately conservative. Pulling any capitalised token out of a title
+produces far more matches, but most of them are junk — `FREE`, `NEW`, model
+numbers — and a Copy Code button that copies rubbish is worse than no button.
 
 ## The price-error score
 
