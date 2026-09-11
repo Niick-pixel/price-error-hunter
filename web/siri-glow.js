@@ -199,13 +199,15 @@
     "}"
   ].join("\n");
 
-  // Reference palette, OKLCH (L 0..1, C, H degrees). Placeholders per the
-  // brief - replace the H/C values once picked off the reference frames.
+  // GlitchGuard palette in OKLCH (L 0..1, C, H degrees). Every hue sits in the
+  // warm band, roughly 30-95 degrees, so the overlay belongs to the same family
+  // as the rest of the UI. The earlier magenta/cyan set read as a rainbow
+  // against a warm page.
   var DEFAULT_STOPS = [
-    [0.68, 0.26, 340],   // hot magenta
-    [0.78, 0.19,  45],   // coral / amber
-    [0.55, 0.24, 285],   // indigo / violet
-    [0.80, 0.15, 200]    // cyan
+    [0.74, 0.15,  62],   // amber
+    [0.83, 0.11,  88],   // honey
+    [0.66, 0.16,  38],   // terracotta
+    [0.79, 0.09,  72]    // warm cream
   ];
 
   var DEFAULTS = {

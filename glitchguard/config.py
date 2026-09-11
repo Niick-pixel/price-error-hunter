@@ -31,7 +31,7 @@ DEFAULTS = {
     "sound_discount": 0,
     "screen_glow": True,
     # Appearance, adjustable from the Settings tab.
-    "bg_theme": "charcoal",
+    "bg_theme": "espresso",
     "card_glow": True,
     "card_glow_discount": 50,
     "source_hiddenclearances": True,

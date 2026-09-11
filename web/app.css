@@ -1,8 +1,8 @@
 :root {
-  /* Charcoal rather than pitch black: less eye strain and it gives the
-     translucent panels something to sit on. */
-  --bg: #202430;
-  --bg-raised: #2a2f3d;
+  /* Warm charcoal with a brown cast rather than a blue one, so the amber
+     accents sit on a related ground instead of fighting it. */
+  --bg: #211d18;
+  --bg-raised: #2c2720;
   /* Glass is a tint plus a blur plus a lit edge. The tint is what the surface
      adds to whatever shows through it, so on dark themes it lightens and on
      light themes it has to darken - hence these being theme variables rather
@@ -20,31 +20,33 @@
   /* Ink for the placeholder tile and for body prose, both of which sit on
      surfaces that flip with the theme. */
   --thumb-ink: rgba(255, 255, 255, .30);
-  --prose: #c3cbdd;
-  --text: #f4f6fb;
-  --muted: #99a3bb;
+  /* Cream-tinted rather than blue-white, to match the warm ground. */
+  --prose: #d8cdba;
+  --text: #f7f0e4;
+  --muted: #b0a493;
 
-  /* GlitchGuard identity: deep indigo carries the brand, electric cyan marks
-     anything live or confirmed, soft coral is reserved for the one thing that
-     matters most - a suspected pricing mistake. Keeping coral scarce is what
-     makes it register instantly in a grid of 150 cards. */
-  --indigo: #5b6cff;
-  --indigo-deep: #3b46c4;
-  --cyan: #22d3ee;
-  --coral: #ff6b5e;
-  --amber: #f5b544;
+  /* GlitchGuard identity, warm rather than cool: amber carries the brand,
+     caramel and honey fill out the mid tones, and a deep terracotta is held
+     back for the one thing that matters most - a suspected pricing mistake.
+     Everything stays inside a warm band so nothing reads as cold blue. */
+  --amber: #e9a23c;
+  --amber-deep: #c17d22;
+  --caramel: #d19a5e;
+  --honey: #e8c68a;
+  --cream: #f3e7d4;
+  --terracotta: #d9694a;
 
-  /* Fill colours and text colours cannot be the same value. The indigo that
-     looks right as a button reaches only 3.71:1 as small label text on this
-     background, so labels use a lifted variant while fills keep the brand hue.
-     Every pairing here is measured, not eyeballed. */
-  --indigo-text: #98a4ff;
-  --cyan-text: #4fdcf0;
+  /* Fill colours and text colours cannot be the same value: the amber that
+     looks right on a button is too dark as small label text here, so labels
+     use a lifted variant while fills keep the brand hue. Measured, not
+     eyeballed - the first pass at this shipped a 3.71:1 label. */
+  --amber-text: #f0bb6a;
+  --honey-text: #ecd0a0;
 
-  --brand: var(--indigo);
-  --error: var(--coral);
-  --strong: var(--amber);
-  --ok: #34d399;
+  --brand: var(--amber);
+  --error: var(--terracotta);
+  --strong: var(--honey);
+  --ok: #6fbf8b;
 
   /* Type scale, 1.25 ratio, and a numeric font feature set so prices align in
      a column and never jitter as they tick over. */
@@ -82,32 +84,32 @@
 html[data-mode="light"] {
   --panel: rgba(255, 255, 255, .55);
   --panel-2: rgba(255, 255, 255, .78);
-  --border: rgba(15, 23, 42, .10);
-  --border-strong: rgba(15, 23, 42, .20);
+  --border: rgba(60, 44, 26, .12);
+  --border-strong: rgba(60, 44, 26, .22);
   --glass-edge: rgba(255, 255, 255, .85);
-  --shadow-soft: 0 14px 34px rgba(23, 27, 56, .10);
-  --shadow-lift: 0 20px 44px rgba(23, 27, 56, .16);
+  --shadow-soft: 0 14px 34px rgba(74, 55, 33, .10);
+  --shadow-lift: 0 20px 44px rgba(74, 55, 33, .17);
   --thumb-bg: #fff;
-  --thumb-ink: rgba(15, 23, 42, .34);
-  --prose: #3d4658;
-  --text: #12162a;
-  --muted: #5a6379;
-  /* The same identity taken down in lightness. The dark-theme indigo and coral
-     only reach about 3:1 on a pale ground, short of the 4.5 small text needs,
-     so each accent is darkened rather than swapped for a different hue. */
-  --indigo: #3f4bd8;
-  --indigo-deep: #2d35a8;
-  --cyan: #0b7c8c;
-  --coral: #c43a2f;
-  --amber: #8a5a08;
-  /* Darkened for text on a pale ground; the fill cyan reaches only 4.34:1. */
-  --indigo-text: #3a45c9;
-  --cyan-text: #076370;
+  --thumb-ink: rgba(60, 44, 26, .34);
+  --prose: #4b3f31;
+  --text: #241c12;
+  --muted: #6b5c4a;
+  /* The same warm identity taken down in lightness. The dark-theme amber only
+     reaches about 2:1 on a cream ground, far short of the 4.5 small text
+     needs, so each accent is darkened rather than swapped for another hue. */
+  --amber: #a2631a;
+  --amber-deep: #7d4b12;
+  --caramel: #8a5f33;
+  --honey: #8a6a2f;
+  --cream: #6b5334;
+  --terracotta: #b0442a;
+  --amber-text: #8a5311;
+  --honey-text: #7a5c26;
 
-  --brand: var(--indigo);
-  --error: var(--coral);
-  --strong: var(--amber);
-  --ok: #046c4e;
+  --brand: var(--amber);
+  --error: var(--terracotta);
+  --strong: var(--honey);
+  --ok: #2f6b4a;
   color-scheme: light;
 }
 
@@ -125,11 +127,11 @@ html {
 body {
   margin: 0;
   background-color: var(--bg);
-  /* Two faint washes in the brand hues, indigo left and cyan right, so the
+  /* Two faint washes in the brand hues, amber left and caramel right, so the
      page has depth without a visible gradient band. */
   background-image:
-    radial-gradient(900px 520px at 12% -8%, rgba(91, 108, 255, .13) 0%, transparent 60%),
-    radial-gradient(760px 480px at 88% 0%, rgba(34, 211, 238, .07) 0%, transparent 62%);
+    radial-gradient(900px 520px at 12% -8%, rgba(233, 162, 60, .13) 0%, transparent 60%),
+    radial-gradient(760px 480px at 88% 0%, rgba(209, 154, 94, .09) 0%, transparent 62%);
   background-attachment: fixed;
   color: var(--text);
   font: 15px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI",
@@ -181,10 +183,10 @@ body {
   width: 40px; height: 40px;
   display: grid; place-items: center;
   border-radius: 12px;
-  background: linear-gradient(135deg, var(--indigo), var(--indigo-deep));
-  color: #fff;
+  background: linear-gradient(135deg, var(--amber), var(--amber-deep));
+  color: #2a1b06;
   font-size: 19px;
-  box-shadow: 0 8px 24px rgba(91, 108, 255, .38);
+  box-shadow: 0 8px 24px rgba(233, 162, 60, .40);
   transition: transform .5s var(--spring);
 }
 .brand:hover .logo { transform: scale(1.08) rotate(-4deg); }
@@ -206,16 +208,16 @@ h1 {
 .pulse {
   width: 10px; height: 10px; border-radius: 50%;
   background: var(--ok);
-  box-shadow: 0 0 0 0 rgba(46, 204, 113, .6);
+  box-shadow: 0 0 0 0 rgba(111, 191, 139, .6);
   animation: ping 2.4s infinite;
 }
 .pulse.busy { background: var(--brand); }
 .pulse.bad { background: var(--error); animation: none; }
 
 @keyframes ping {
-  0%   { box-shadow: 0 0 0 0 rgba(46, 204, 113, .55); }
-  70%  { box-shadow: 0 0 0 9px rgba(46, 204, 113, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); }
+  0%   { box-shadow: 0 0 0 0 rgba(111, 191, 139, .55); }
+  70%  { box-shadow: 0 0 0 9px rgba(111, 191, 139, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(111, 191, 139, 0); }
 }
 
 .btn {
@@ -625,7 +627,7 @@ body.modal-open { overflow: hidden; }
   font-weight: 700;
   letter-spacing: .08em;
   text-transform: uppercase;
-  color: var(--indigo-text);
+  color: var(--amber-text);
   margin-bottom: 3px;
 }
 .alerttitle {
@@ -637,7 +639,7 @@ body.modal-open { overflow: hidden; }
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
-.alertkicker.watch { color: #4ea6ff; }
+.alertkicker.watch { color: var(--honey-text); }
 .alertmeta { font-size: 12px; color: var(--muted); margin-top: 3px; }
 
 .alertclose {
@@ -687,7 +689,7 @@ body.modal-open { overflow: hidden; }
   border-radius: 50%;
   background: var(--panel-2);
   border: 1px solid var(--border);
-  color: var(--indigo);
+  color: var(--amber);
 }
 .empty h3 {
   margin: 0 0 var(--s2);
@@ -827,24 +829,28 @@ body.modal-open { overflow: hidden; }
    unrelated neons, lower opacity, and a 14s lap rather than 9s. The effect
    should read as the card being lit from behind, not as a light show - at 150
    cards, anything stronger becomes noise and stops meaning anything. */
+/* Offsets are equal in all four directions - previously the top was -14px and
+   the bottom +18px, which lit the lower edge more than the upper one and made
+   the halo look lopsided. Equal offset, equal blur and equal alpha per corner
+   are what make it read as symmetrical. */
 @keyframes cardAurora {
   0%, 100% {
-    box-shadow: -18px -12px 34px -10px rgba( 91, 108, 255, .42),
-                 18px -12px 34px -10px rgba( 34, 211, 238, .34),
-                 18px  16px 38px -10px rgba(255, 107,  94, .32),
-                -18px  16px 38px -10px rgba( 91, 108, 255, .30);
+    box-shadow: -18px -18px 36px -10px rgba(233, 162,  60, .40),
+                 18px -18px 36px -10px rgba(209, 154,  94, .40),
+                 18px  18px 36px -10px rgba(232, 198, 138, .40),
+                -18px  18px 36px -10px rgba(217, 105,  74, .40);
   }
   33% {
-    box-shadow: -18px -12px 34px -10px rgba(255, 107,  94, .32),
-                 18px -12px 34px -10px rgba( 91, 108, 255, .42),
-                 18px  16px 38px -10px rgba( 34, 211, 238, .34),
-                -18px  16px 38px -10px rgba(255, 107,  94, .30);
+    box-shadow: -18px -18px 36px -10px rgba(217, 105,  74, .40),
+                 18px -18px 36px -10px rgba(233, 162,  60, .40),
+                 18px  18px 36px -10px rgba(209, 154,  94, .40),
+                -18px  18px 36px -10px rgba(232, 198, 138, .40);
   }
   66% {
-    box-shadow: -18px -12px 34px -10px rgba( 34, 211, 238, .34),
-                 18px -12px 34px -10px rgba(255, 107,  94, .32),
-                 18px  16px 38px -10px rgba( 91, 108, 255, .42),
-                -18px  16px 38px -10px rgba( 34, 211, 238, .30);
+    box-shadow: -18px -18px 36px -10px rgba(232, 198, 138, .40),
+                 18px -18px 36px -10px rgba(217, 105,  74, .40),
+                 18px  18px 36px -10px rgba(233, 162,  60, .40),
+                -18px  18px 36px -10px rgba(209, 154,  94, .40);
   }
 }
 
@@ -853,20 +859,20 @@ body.modal-open { overflow: hidden; }
 /* Hover lifts the bloom a little rather than switching to a different look. */
 .card.glow:hover {
   box-shadow: var(--shadow-lift),
-              -20px -14px 40px -8px rgba( 91, 108, 255, .58),
-               20px -14px 40px -8px rgba( 34, 211, 238, .48),
-               20px  18px 44px -8px rgba(255, 107,  94, .44),
-              -20px  18px 44px -8px rgba( 91, 108, 255, .42);
+              -20px -20px 42px -8px rgba(233, 162,  60, .55),
+               20px -20px 42px -8px rgba(209, 154,  94, .55),
+               20px  20px 42px -8px rgba(232, 198, 138, .55),
+              -20px  20px 42px -8px rgba(217, 105,  74, .55);
   animation: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .card.glow {
     animation: none;
-    box-shadow: -20px -14px 38px -6px rgba(255,  45, 149, .50),
-                 20px -14px 38px -6px rgba(255, 138,  61, .46),
-                 20px  18px 42px -6px rgba( 34, 211, 238, .46),
-                -20px  18px 42px -6px rgba(123,  92, 255, .48);
+    box-shadow: -18px -18px 36px -8px rgba(233, 162,  60, .42),
+                 18px -18px 36px -8px rgba(209, 154,  94, .42),
+                 18px  18px 36px -8px rgba(232, 198, 138, .42),
+                -18px  18px 36px -8px rgba(217, 105,  74, .42);
   }
 }
 
@@ -882,32 +888,32 @@ html[data-mode="light"] .card.glow {
 
 @keyframes cardAuroraLight {
   0%, 100% {
-    box-shadow: -16px -10px 28px -10px rgba( 63,  75, 216, .42),
-                 16px -10px 28px -10px rgba( 11, 124, 140, .36),
-                 16px  14px 32px -10px rgba(196,  58,  47, .32),
-                -16px  14px 32px -10px rgba( 63,  75, 216, .30);
+    box-shadow: -16px -16px 30px -10px rgba(162,  99,  26, .40),
+                 16px -16px 30px -10px rgba(138,  95,  51, .40),
+                 16px  16px 30px -10px rgba(138, 106,  47, .40),
+                -16px  16px 30px -10px rgba(176,  68,  42, .40);
   }
   33% {
-    box-shadow: -16px -10px 28px -10px rgba(196,  58,  47, .32),
-                 16px -10px 28px -10px rgba( 63,  75, 216, .42),
-                 16px  14px 32px -10px rgba( 11, 124, 140, .36),
-                -16px  14px 32px -10px rgba(196,  58,  47, .30);
+    box-shadow: -16px -16px 30px -10px rgba(176,  68,  42, .40),
+                 16px -16px 30px -10px rgba(162,  99,  26, .40),
+                 16px  16px 30px -10px rgba(138,  95,  51, .40),
+                -16px  16px 30px -10px rgba(138, 106,  47, .40);
   }
   66% {
-    box-shadow: -16px -10px 28px -10px rgba( 11, 124, 140, .36),
-                 16px -10px 28px -10px rgba(196,  58,  47, .32),
-                 16px  14px 32px -10px rgba( 63,  75, 216, .42),
-                -16px  14px 32px -10px rgba( 11, 124, 140, .30);
+    box-shadow: -16px -16px 30px -10px rgba(138, 106,  47, .40),
+                 16px -16px 30px -10px rgba(176,  68,  42, .40),
+                 16px  16px 30px -10px rgba(162,  99,  26, .40),
+                -16px  16px 30px -10px rgba(138,  95,  51, .40);
   }
 }
 
 html[data-mode="light"] .card.glow:hover {
   animation: none;
   box-shadow: var(--shadow-lift),
-              -18px -12px 32px -8px rgba( 63,  75, 216, .50),
-               18px -12px 32px -8px rgba( 11, 124, 140, .44),
-               18px  16px 36px -8px rgba(196,  58,  47, .40),
-              -18px  16px 36px -8px rgba( 63,  75, 216, .38);
+              -18px -18px 34px -8px rgba(162,  99,  26, .52),
+               18px -18px 34px -8px rgba(138,  95,  51, .52),
+               18px  18px 34px -8px rgba(138, 106,  47, .52),
+              -18px  18px 34px -8px rgba(176,  68,  42, .52);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -958,15 +964,15 @@ html[data-mode="light"] .card.glow:hover {
   border: 1px solid var(--glass-edge);
 }
 .badge.strong {
-  background: rgba(245, 181, 68, .16);
+  background: rgba(232, 198, 138, .16);
   color: var(--amber);
-  border: 1px solid rgba(245, 181, 68, .42);
+  border: 1px solid rgba(232, 198, 138, .44);
 }
 .badge.error {
-  background: linear-gradient(135deg, var(--coral), #ff4f7e);
+  background: linear-gradient(135deg, var(--terracotta), #e0825a);
   color: #fff;
   border: 1px solid rgba(255, 255, 255, .22);
-  box-shadow: 0 6px 18px -4px rgba(255, 107, 94, .55);
+  box-shadow: 0 6px 18px -4px rgba(217, 105, 74, .55);
 }
 
 html[data-mode="light"] .badge.normal {
@@ -975,16 +981,16 @@ html[data-mode="light"] .badge.normal {
   border-color: rgba(15, 23, 42, .12);
 }
 html[data-mode="light"] .badge.strong {
-  background: rgba(138, 90, 8, .10);
-  border-color: rgba(138, 90, 8, .32);
+  background: rgba(138, 106, 47, .12);
+  border-color: rgba(138, 106, 47, .34);
 }
 
 .newflag {
   position: absolute;
   top: var(--s3); left: var(--s3);
-  background: rgba(34, 211, 238, .16);
-  color: var(--cyan-text);
-  border: 1px solid rgba(34, 211, 238, .45);
+  background: rgba(209, 154, 94, .18);
+  color: var(--honey-text);
+  border: 1px solid rgba(209, 154, 94, .48);
   font-size: 9.5px;
   font-weight: 700;
   padding: 4px 8px;
@@ -994,8 +1000,8 @@ html[data-mode="light"] .badge.strong {
   -webkit-backdrop-filter: blur(10px);
 }
 html[data-mode="light"] .newflag {
-  background: rgba(11, 124, 140, .10);
-  border-color: rgba(11, 124, 140, .34);
+  background: rgba(138, 95, 51, .12);
+  border-color: rgba(138, 95, 51, .36);
 }
 
 .body { padding: var(--s4) var(--s4) var(--s4); }
@@ -1012,7 +1018,7 @@ html[data-mode="light"] .newflag {
   font-weight: 700;
   letter-spacing: .7px;
   text-transform: uppercase;
-  color: var(--indigo-text);
+  color: var(--amber-text);
 }
 
 .srctag {
@@ -1065,15 +1071,15 @@ html[data-mode="light"] .newflag {
   font-size: 11px;
   font-weight: 700;
   color: var(--ok);
-  background: rgba(52, 211, 153, .14);
-  border: 1px solid rgba(52, 211, 153, .34);
+  background: rgba(111, 191, 139, .15);
+  border: 1px solid rgba(111, 191, 139, .36);
   padding: 2px 8px;
   border-radius: var(--radius-pill);
   font-variant-numeric: tabular-nums;
 }
 html[data-mode="light"] .off {
-  background: rgba(4, 108, 78, .10);
-  border-color: rgba(4, 108, 78, .30);
+  background: rgba(47, 107, 74, .12);
+  border-color: rgba(47, 107, 74, .32);
 }
 
 .meta {
@@ -1085,7 +1091,7 @@ html[data-mode="light"] .off {
   gap: var(--s2);
   font-variant-numeric: tabular-nums;
 }
-.meta .save { color: var(--cyan-text); font-weight: 600; }
+.meta .save { color: var(--honey-text); font-weight: 600; }
 
 /* ---------- expanded detail ---------- */
 .detail { border-top: 1px solid var(--border); margin-top: 13px; padding-top: 14px; }
@@ -1169,9 +1175,9 @@ html[data-mode="light"] .off {
 .chartwrap img { display: block; width: 100%; height: auto; }
 .chartcap { font-size: 11px; color: var(--muted); margin: 0 0 10px; }
 
-/* Promo code. Cyan marks it as actionable and distinct from the coral used
-   for a suspected pricing error, and the code itself is monospace so lookalike
-   characters can be told apart before pasting. */
+/* Promo code. Caramel marks it as actionable and distinct from the terracotta
+   used for a suspected pricing error, and the code itself is monospace so
+   lookalike characters can be told apart before pasting. */
 .coupon {
   display: flex;
   align-items: center;
@@ -1179,17 +1185,17 @@ html[data-mode="light"] .off {
   margin-top: var(--s3);
   padding: 7px 8px 7px 10px;
   border-radius: 11px;
-  background: rgba(34, 211, 238, .09);
-  border: 1px dashed rgba(34, 211, 238, .45);
+  background: rgba(209, 154, 94, .11);
+  border: 1px dashed rgba(209, 154, 94, .48);
   transition: background .3s var(--ease), border-color .3s var(--ease);
 }
 html[data-mode="light"] .coupon {
-  background: rgba(11, 124, 140, .07);
-  border-color: rgba(11, 124, 140, .38);
+  background: rgba(138, 95, 51, .09);
+  border-color: rgba(138, 95, 51, .40);
 }
 .coupon.copied {
-  background: rgba(52, 211, 153, .13);
-  border-color: rgba(52, 211, 153, .5);
+  background: rgba(111, 191, 139, .15);
+  border-color: rgba(111, 191, 139, .5);
   border-style: solid;
 }
 
@@ -1197,7 +1203,7 @@ html[data-mode="light"] .coupon {
   font-size: 9px;
   font-weight: 700;
   letter-spacing: var(--tracking-wide);
-  color: var(--cyan-text);
+  color: var(--honey-text);
   flex-shrink: 0;
 }
 .couponcode {
@@ -1221,11 +1227,11 @@ html[data-mode="light"] .coupon {
   font-size: 11px;
   font-weight: 650;
   cursor: pointer;
-  color: #04222a;
-  background: var(--cyan);
+  color: #2a1b06;
+  background: var(--caramel);
   transition: transform .3s var(--spring), filter .2s var(--ease);
 }
-html[data-mode="light"] .couponbtn { color: #fff; }
+html[data-mode="light"] .couponbtn { color: #fff5e6; }
 .couponbtn:hover { filter: brightness(1.08); }
 .couponbtn:active { transform: scale(.94); }
 
@@ -1235,11 +1241,13 @@ html[data-mode="light"] .couponbtn { color: #fff; }
   margin-top: 12px;
   padding: 9px 12px;
   border-radius: 10px;
-  /* Indigo into a deeper indigo rather than the old orange, which now fights
-     the palette. Coral is deliberately not used here - it is reserved for the
+  /* Amber into a deeper amber. Coral is deliberately not used here - it is reserved for the
      price-error badge so it keeps its meaning. */
-  background: linear-gradient(135deg, var(--indigo), var(--indigo-deep));
-  color: #fff;
+  /* Dark ink on amber, not white. Amber is a light hue - white on it measured
+     3.37:1, under AA - whereas a deep warm brown clears it comfortably and
+     reads as intentional rather than washed out. */
+  background: linear-gradient(135deg, var(--amber), var(--amber-deep));
+  color: #2a1b06;
   font-size: var(--fs-small);
   font-weight: 600;
   text-align: center;
@@ -1251,9 +1259,15 @@ html[data-mode="light"] .couponbtn { color: #fff; }
 .quicklink:hover {
   filter: brightness(1.12);
   transform: translateY(-1px);
-  box-shadow: 0 8px 22px -6px rgba(91, 108, 255, .62);
+  box-shadow: 0 8px 22px -6px rgba(233, 162, 60, .58);
 }
 .quicklink:active { transform: scale(.97); }
+
+/* In light mode the amber fill is dark, so the ink flips to cream. Dark ink on
+   a dark fill measured 2.3:1; this pairing is the inverse of the dark theme's
+   for the same reason. */
+html[data-mode="light"] .quicklink { color: #fdf6ea; }
+html[data-mode="light"] .logo { color: #fdf6ea; }
 
 .actions { display: flex; gap: 10px; flex-wrap: wrap; }
 

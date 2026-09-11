@@ -37,20 +37,22 @@ let GLOW_DISCOUNT = 50;
 
 /* mode drives the light/dark variable block in the stylesheet; bg/raised are
    the two surfaces each theme paints on top of it. */
+/* Warm grounds only. The previous set was blue-grey, which fought the amber
+   accents no matter how the accents were tuned - a cool background makes a
+   warm accent look like an error rather than a choice. */
 const BG_THEMES = {
-  charcoal: { label: "Charcoal", mode: "dark",  bg: "#202430", raised: "#2a2f3d" },
-  slate:    { label: "Slate",    mode: "dark",  bg: "#1b2130", raised: "#262d40" },
-  midnight: { label: "Midnight", mode: "dark",  bg: "#141824", raised: "#1e2333" },
-  ink:      { label: "Ink",      mode: "dark",  bg: "#0d1117", raised: "#161b22" },
-  graphite: { label: "Graphite", mode: "dark",  bg: "#26262b", raised: "#323238" },
-  cocoa:    { label: "Cocoa",    mode: "dark",  bg: "#241f1d", raised: "#302926" },
-  daylight: { label: "Daylight", mode: "light", bg: "#eef1f6", raised: "#ffffff" },
-  paper:    { label: "Paper",    mode: "light", bg: "#f6f3ee", raised: "#fffdfa" },
-  mist:     { label: "Mist",     mode: "light", bg: "#e8eef2", raised: "#f9fcfd" },
+  espresso: { label: "Espresso", mode: "dark",  bg: "#211d18", raised: "#2c2720" },
+  walnut:   { label: "Walnut",   mode: "dark",  bg: "#26201a", raised: "#332b22" },
+  umber:    { label: "Umber",    mode: "dark",  bg: "#1b1713", raised: "#25201a" },
+  clay:     { label: "Clay",     mode: "dark",  bg: "#2a231e", raised: "#372e27" },
+  graphite: { label: "Graphite", mode: "dark",  bg: "#232120", raised: "#2f2c2a" },
+  cream:    { label: "Cream",    mode: "light", bg: "#f7f1e6", raised: "#fffdf8" },
+  linen:    { label: "Linen",    mode: "light", bg: "#f3ebdd", raised: "#fdf8ef" },
+  sand:     { label: "Sand",     mode: "light", bg: "#efe6d5", raised: "#fbf5ea" },
 };
 
 function applyTheme(name) {
-  const t = BG_THEMES[name] || BG_THEMES.charcoal;
+  const t = BG_THEMES[name] || BG_THEMES.espresso;
   const root = document.documentElement;
   root.style.setProperty("--bg", t.bg);
   root.style.setProperty("--bg-raised", t.raised);
@@ -884,7 +886,7 @@ function applySettings(cfg) {
     $("o-alertscore").textContent = String(cfg.alert_score ?? 75);
     GLOW_DISCOUNT = cfg.card_glow_discount ?? 50;
     buildSettings(cfg);
-    applyTheme(cfg.bg_theme || "charcoal");
+    applyTheme(cfg.bg_theme || "espresso");
     firstLoad = false;
   }
   // Created lazily so the WebGL context only exists when it is wanted.
@@ -1073,7 +1075,7 @@ function saveSettings() {
     watch_keywords: $("watchwords").value,
     deal_ttl_hours: Number($("dealttl").value),
     alert_max_age_minutes: Number($("alertage").value),
-    bg_theme: document.querySelector(".swatch.on")?.dataset.theme || "charcoal",
+    bg_theme: document.querySelector(".swatch.on")?.dataset.theme || "espresso",
     card_glow: $("cardglowon").checked,
     card_glow_discount: Number($("cardglow").value),
     alert_score: Number($("alertscore").value),
