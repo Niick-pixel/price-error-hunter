@@ -829,28 +829,28 @@ body.modal-open { overflow: hidden; }
    unrelated neons, lower opacity, and a 14s lap rather than 9s. The effect
    should read as the card being lit from behind, not as a light show - at 150
    cards, anything stronger becomes noise and stops meaning anything. */
-/* Offsets are equal in all four directions - previously the top was -14px and
-   the bottom +18px, which lit the lower edge more than the upper one and made
-   the halo look lopsided. Equal offset, equal blur and equal alpha per corner
-   are what make it read as symmetrical. */
+/* Colourful, but quiet. Symmetry is kept from the fix - equal offset, blur and
+   alpha on all four corners - while the alpha is roughly 40% of what it was so
+   the halo reads as a tint around the card rather than something competing
+   with the card's own content. */
 @keyframes cardAurora {
   0%, 100% {
-    box-shadow: -18px -18px 36px -10px rgba(233, 162,  60, .40),
-                 18px -18px 36px -10px rgba(209, 154,  94, .40),
-                 18px  18px 36px -10px rgba(232, 198, 138, .40),
-                -18px  18px 36px -10px rgba(217, 105,  74, .40);
+    box-shadow: -16px -16px 30px -12px rgba(236,  92, 168, .24),
+                 16px -16px 30px -12px rgba( 92, 200, 235, .24),
+                 16px  16px 30px -12px rgba(140, 120, 245, .24),
+                -16px  16px 30px -12px rgba(245, 140, 110, .24);
   }
   33% {
-    box-shadow: -18px -18px 36px -10px rgba(217, 105,  74, .40),
-                 18px -18px 36px -10px rgba(233, 162,  60, .40),
-                 18px  18px 36px -10px rgba(209, 154,  94, .40),
-                -18px  18px 36px -10px rgba(232, 198, 138, .40);
+    box-shadow: -16px -16px 30px -12px rgba(245, 140, 110, .24),
+                 16px -16px 30px -12px rgba(236,  92, 168, .24),
+                 16px  16px 30px -12px rgba( 92, 200, 235, .24),
+                -16px  16px 30px -12px rgba(140, 120, 245, .24);
   }
   66% {
-    box-shadow: -18px -18px 36px -10px rgba(232, 198, 138, .40),
-                 18px -18px 36px -10px rgba(217, 105,  74, .40),
-                 18px  18px 36px -10px rgba(233, 162,  60, .40),
-                -18px  18px 36px -10px rgba(209, 154,  94, .40);
+    box-shadow: -16px -16px 30px -12px rgba(140, 120, 245, .24),
+                 16px -16px 30px -12px rgba(245, 140, 110, .24),
+                 16px  16px 30px -12px rgba(236,  92, 168, .24),
+                -16px  16px 30px -12px rgba( 92, 200, 235, .24);
   }
 }
 
@@ -859,20 +859,20 @@ body.modal-open { overflow: hidden; }
 /* Hover lifts the bloom a little rather than switching to a different look. */
 .card.glow:hover {
   box-shadow: var(--shadow-lift),
-              -20px -20px 42px -8px rgba(233, 162,  60, .55),
-               20px -20px 42px -8px rgba(209, 154,  94, .55),
-               20px  20px 42px -8px rgba(232, 198, 138, .55),
-              -20px  20px 42px -8px rgba(217, 105,  74, .55);
+              -18px -18px 34px -10px rgba(236,  92, 168, .38),
+               18px -18px 34px -10px rgba( 92, 200, 235, .38),
+               18px  18px 34px -10px rgba(140, 120, 245, .38),
+              -18px  18px 34px -10px rgba(245, 140, 110, .38);
   animation: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .card.glow {
     animation: none;
-    box-shadow: -18px -18px 36px -8px rgba(233, 162,  60, .42),
-                 18px -18px 36px -8px rgba(209, 154,  94, .42),
-                 18px  18px 36px -8px rgba(232, 198, 138, .42),
-                -18px  18px 36px -8px rgba(217, 105,  74, .42);
+    box-shadow: -16px -16px 30px -12px rgba(236,  92, 168, .24),
+                 16px -16px 30px -12px rgba( 92, 200, 235, .24),
+                 16px  16px 30px -12px rgba(140, 120, 245, .24),
+                -16px  16px 30px -12px rgba(245, 140, 110, .24);
   }
 }
 
@@ -888,32 +888,32 @@ html[data-mode="light"] .card.glow {
 
 @keyframes cardAuroraLight {
   0%, 100% {
-    box-shadow: -16px -16px 30px -10px rgba(162,  99,  26, .40),
-                 16px -16px 30px -10px rgba(138,  95,  51, .40),
-                 16px  16px 30px -10px rgba(138, 106,  47, .40),
-                -16px  16px 30px -10px rgba(176,  68,  42, .40);
+    box-shadow: -14px -14px 26px -12px rgba(190,  40, 120, .26),
+                 14px -14px 26px -12px rgba( 20, 120, 160, .26),
+                 14px  14px 26px -12px rgba( 88,  70, 200, .26),
+                -14px  14px 26px -12px rgba(200,  80,  55, .26);
   }
   33% {
-    box-shadow: -16px -16px 30px -10px rgba(176,  68,  42, .40),
-                 16px -16px 30px -10px rgba(162,  99,  26, .40),
-                 16px  16px 30px -10px rgba(138,  95,  51, .40),
-                -16px  16px 30px -10px rgba(138, 106,  47, .40);
+    box-shadow: -14px -14px 26px -12px rgba(200,  80,  55, .26),
+                 14px -14px 26px -12px rgba(190,  40, 120, .26),
+                 14px  14px 26px -12px rgba( 20, 120, 160, .26),
+                -14px  14px 26px -12px rgba( 88,  70, 200, .26);
   }
   66% {
-    box-shadow: -16px -16px 30px -10px rgba(138, 106,  47, .40),
-                 16px -16px 30px -10px rgba(176,  68,  42, .40),
-                 16px  16px 30px -10px rgba(162,  99,  26, .40),
-                -16px  16px 30px -10px rgba(138,  95,  51, .40);
+    box-shadow: -14px -14px 26px -12px rgba( 88,  70, 200, .26),
+                 14px -14px 26px -12px rgba(200,  80,  55, .26),
+                 14px  14px 26px -12px rgba(190,  40, 120, .26),
+                -14px  14px 26px -12px rgba( 20, 120, 160, .26);
   }
 }
 
 html[data-mode="light"] .card.glow:hover {
   animation: none;
   box-shadow: var(--shadow-lift),
-              -18px -18px 34px -8px rgba(162,  99,  26, .52),
-               18px -18px 34px -8px rgba(138,  95,  51, .52),
-               18px  18px 34px -8px rgba(138, 106,  47, .52),
-              -18px  18px 34px -8px rgba(176,  68,  42, .52);
+              -16px -16px 30px -10px rgba(190,  40, 120, .38),
+               16px -16px 30px -10px rgba( 20, 120, 160, .38),
+               16px  16px 30px -10px rgba( 88,  70, 200, .38),
+              -16px  16px 30px -10px rgba(200,  80,  55, .38);
 }
 
 @media (prefers-reduced-motion: reduce) {

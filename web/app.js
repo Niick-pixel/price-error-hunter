@@ -79,7 +79,7 @@ function initScreenGlow() {
   try {
     // Above the alert card (60), below the detail modal (80), so opening a
     // deal is never washed out by it.
-    screenGlow = new SiriGlow({ zIndex: 75, lambda: 54, hairline: 0.7 });
+    screenGlow = new SiriGlow({ zIndex: 75, lambda: 38, hairline: 0.45 });
   } catch (err) {
     screenGlow = null;   // never let an effect break the app
   }
@@ -701,7 +701,7 @@ function soundOnlyPing(status) {
     if (settings.sound_alerts) chime();
     // These raise no card on purpose, so keep the glow brief and dim - it is
     // a cue to glance at the feed, not something to dismiss.
-    glowPulse(0.4, 2200);
+    glowPulse(0.24, 2200);
   }
 }
 
@@ -722,7 +722,7 @@ function renderAlert(top, keyword) {
     if (settings.sound_alerts) chime();
     notifyDesktop(top);
     // Brightness tracks how strong the find is.
-    glowPulse(0.55 + 0.45 * Math.min(1, (top.score || 0) / 100), 5000);
+    glowPulse(0.32 + 0.26 * Math.min(1, (top.score || 0) / 100), 5000);
   }
   if (keyword) lastAlertId = top.id;
 
@@ -792,7 +792,7 @@ function watchAlert(status) {
   if (settings.sound_alerts) chime("watch");
   notifyDesktop({ ...hit, title: `“${hit.keyword}” — ${hit.title}` });
   renderAlert(hit, hit.keyword);
-  glowPulse(1, 6000);
+  glowPulse(0.6, 6000);
   return true;
 }
 
@@ -1121,7 +1121,7 @@ $("screenglow").addEventListener("change", () => {
   settings.screen_glow = $("screenglow").checked;
   if (settings.screen_glow) {
     initScreenGlow();
-    glowPulse(0.7, 1600);        // confirm the toggle did something
+    glowPulse(0.45, 1600);        // confirm the toggle did something
   } else {
     glowStop();
   }

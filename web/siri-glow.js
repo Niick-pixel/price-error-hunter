@@ -199,15 +199,14 @@
     "}"
   ].join("\n");
 
-  // GlitchGuard palette in OKLCH (L 0..1, C, H degrees). Every hue sits in the
-  // warm band, roughly 30-95 degrees, so the overlay belongs to the same family
-  // as the rest of the UI. The earlier magenta/cyan set read as a rainbow
-  // against a warm page.
+  // Palette in OKLCH (L 0..1, C, H degrees). Deliberately full-spectrum - the
+  // colour is the point of this effect - but the chroma is pulled back from the
+  // original so it tints the edge of the screen rather than dominating it.
   var DEFAULT_STOPS = [
-    [0.74, 0.15,  62],   // amber
-    [0.83, 0.11,  88],   // honey
-    [0.66, 0.16,  38],   // terracotta
-    [0.79, 0.09,  72]    // warm cream
+    [0.70, 0.17, 340],   // magenta
+    [0.78, 0.13,  45],   // coral / amber
+    [0.60, 0.16, 285],   // indigo / violet
+    [0.80, 0.11, 200]    // cyan
   ];
 
   var DEFAULTS = {
