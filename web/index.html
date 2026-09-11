@@ -153,8 +153,18 @@
     </div>
 
     <div class="setrow">
+      <label class="setlabel" for="screenglowint">
+        Screen glow <span class="setnote">the light around the window edge when something lands — 0 turns it off</span>
+      </label>
+      <div class="rangerow">
+        <input type="range" id="screenglowint" min="0" max="100" step="5" value="45">
+        <output id="o-screenglowint">45</output>
+      </div>
+    </div>
+
+    <div class="setrow">
       <label class="setlabel">
-        Glow colour <span class="setnote">the preset cycles four hues; a single colour holds still</span>
+        Glow colour <span class="setnote">used by both the cards and the screen edge</span>
       </label>
       <div class="seg" id="glowstyle">
         <button type="button" class="segbtn" data-style="rainbow">Rainbow</button>

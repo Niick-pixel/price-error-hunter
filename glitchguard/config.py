@@ -42,6 +42,10 @@ DEFAULTS = {
     # 0-100. Drives alpha, offset and blur together - turning one up without
     # the others just makes a harder edge, not a brighter light.
     "glow_strength": 70,
+    # Screen-edge glow intensity, 0-100. Separate from card strength because
+    # the two are read at different distances: an edge effect filling the whole
+    # window is overbearing long before a halo round a card is.
+    "screen_glow_intensity": 45,
     "source_hiddenclearances": True,
     # Live Amazon lookups. Off by default: Amazon serves a CAPTCHA within a
     # couple of automated requests, so this is best-effort only.

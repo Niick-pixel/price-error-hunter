@@ -107,6 +107,27 @@ remains.
 something lands — a full-screen signed-distance-field glow, superellipse
 corners, colour sampled around the perimeter in OKLCH (`web/siri-glow.js`).
 
+**It shares the card glow's palette.** The overlay takes its colours in OKLCH
+while the cards hold theirs as sRGB triples, so the two are converted from one
+source at runtime. Before that they were separate hardcoded palettes and
+choosing a single glow colour changed the cards while leaving the screen edge
+on its original four hues. Lightness gets a floor on the way across: the
+overlay is additive light laid over the page, so light mode's deliberately dark
+palette would otherwise be invisible — hue and chroma carry the identity, and
+only lightness is lifted.
+
+**Screen glow** under Appearance sets its intensity, 0–100, as a straight
+fraction of full power; **0 turns it off**. The default of 45 is a little under
+half, and it is a separate slider from card glow strength because the two are
+read at different distances — an effect filling the whole window is overbearing
+long before a halo around a card is.
+
+The app also drives the overlay well below the library's own defaults. The
+tight bloom layer and the specular corner hairline are the two things that make
+it read as a hard bright rim, so those are cut hardest (hairline `0.9 → 0.16`)
+and the falloff is widened to compensate — spread rather than brightness, the
+same trade the card glow makes.
+
 It fires on three moments only, never on the routine background poll, which
 would make it wallpaper:
 

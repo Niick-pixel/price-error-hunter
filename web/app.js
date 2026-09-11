@@ -64,6 +64,12 @@ function applyTheme(name) {
   document.querySelectorAll(".swatch").forEach((s) =>
     s.classList.toggle("on", s.dataset.theme === name)
   );
+  // Switching between a dark and a light theme swaps the glow palette, and the
+  // overlay holds its own copy of it, so it has to be told.
+  if (screenGlow && typeof screenGlowStops === "function") {
+    const stops = screenGlowStops();
+    if (stops) screenGlow.set("stops", stops);
+  }
 }
 
 /* ---------- card glow ----------
@@ -90,6 +96,47 @@ function hexTriple(hex) {
   return `${(n >> 16) & 255} ${(n >> 8) & 255} ${n & 255}`;
 }
 
+/* The screen-edge overlay takes its palette in OKLCH, while the card glow is
+   held as sRGB triples. Converting one into the other is what makes the two
+   actually match: before this the overlay carried its own hardcoded palette,
+   so choosing a single glow colour changed the cards and left the screen edge
+   on the original four hues. */
+function rgbToOklch(r, g, b) {
+  const lin = (v) => {
+    v /= 255;
+    return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  };
+  const R = lin(r), G = lin(g), B = lin(b);
+  const l = Math.cbrt(0.4122214708 * R + 0.5363325363 * G + 0.0514459929 * B);
+  const m = Math.cbrt(0.2119034982 * R + 0.6806995451 * G + 0.1073969566 * B);
+  const s = Math.cbrt(0.0883024619 * R + 0.2817188376 * G + 0.6299787005 * B);
+  const L = 0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s;
+  const A = 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s;
+  const Bb = 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s;
+  const C = Math.sqrt(A * A + Bb * Bb);
+  let H = (Math.atan2(Bb, A) * 180) / Math.PI;
+  if (H < 0) H += 360;
+  return [L, C, H];
+}
+
+// The overlay is additive light laid over the page, so a hue that works as
+// shade on the cards is simply invisible here. Light mode's palette is
+// deliberately dark for that reason, so lightness gets a floor while hue and
+// chroma carry the identity across unchanged.
+const SCREEN_GLOW_MIN_L = 0.62;
+
+function screenGlowStops() {
+  const cs = getComputedStyle(document.documentElement);
+  const stops = [];
+  for (const n of [1, 2, 3, 4]) {
+    const parts = cs.getPropertyValue(`--glow-h${n}`).trim().split(/[\s,]+/).map(Number);
+    if (parts.length < 3 || parts.some(Number.isNaN)) return null;
+    const [L, C, H] = rgbToOklch(parts[0], parts[1], parts[2]);
+    stops.push([Math.max(L, SCREEN_GLOW_MIN_L), C, H]);
+  }
+  return stops;
+}
+
 function applyGlow(cfg) {
   const root = document.documentElement;
   const style = cfg.glow_style === "solid" ? "solid" : GLOW_STYLE_DEFAULT;
@@ -108,6 +155,10 @@ function applyGlow(cfg) {
     b.classList.toggle("on", b.dataset.style === style)
   );
   $("glowcolor").classList.toggle("hidden", style !== "solid");
+
+  // One colour choice, both effects.
+  const stops = screenGlowStops();
+  if (screenGlow && stops) screenGlow.set("stops", stops);
 }
 
 /* ---------- screen edge glow ----------
@@ -121,18 +172,41 @@ let glowTimer = null;
 function initScreenGlow() {
   if (screenGlow || !window.SiriGlow) return;
   try {
-    // Above the alert card (60), below the detail modal (80), so opening a
-    // deal is never washed out by it.
-    screenGlow = new SiriGlow({ zIndex: 75, lambda: 38, hairline: 0.45 });
+    // Tuned well below the library defaults, which are built for a full-screen
+    // assistant effect where the glow IS the interface. Here it is a signal
+    // over a page being read, so the tight bloom layer and the specular corner
+    // hairline - the two things that make it read as a hard bright rim - are
+    // cut hardest, and the falloff is widened to compensate. Spread rather
+    // than brightness, the same trade the card glow makes.
+    screenGlow = new SiriGlow({
+      // Above the alert card (60), below the detail modal (80), so opening a
+      // deal is never washed out by it.
+      zIndex: 75,
+      lambda: 46,
+      bloomWeights: [0.34, 0.46, 0.38],
+      hairline: 0.16,
+      lobeGain: 0.34,
+      breatheAmount: 0.07,
+      stops: screenGlowStops() || undefined,
+    });
   } catch (err) {
     screenGlow = null;   // never let an effect break the app
   }
 }
 
+/* The slider is a straight fraction of full power, so 100 is the old
+   behaviour and the default 45 is a little under half of it. */
+function screenGlowScale() {
+  const v = Number(settings.screen_glow_intensity);
+  return Math.max(0, Math.min(100, Number.isFinite(v) ? v : 45)) / 100;
+}
+
 function glowPulse(amplitude, holdMs) {
   if (!screenGlow || !settings.screen_glow) return;
+  const scale = screenGlowScale();
+  if (scale <= 0) return;
   clearTimeout(glowTimer);
-  screenGlow.amplitude = amplitude;
+  screenGlow.amplitude = amplitude * scale;
   screenGlow.state = "listening";
   glowTimer = setTimeout(() => {
     screenGlow.state = "exit";
@@ -926,6 +1000,8 @@ function applySettings(cfg) {
     $("glowstrength").value = String(cfg.glow_strength ?? 70);
     $("o-glowstrength").textContent = String(cfg.glow_strength ?? 70);
     $("glowcolor").value = cfg.glow_color || "#e9a23c";
+    $("screenglowint").value = String(cfg.screen_glow_intensity ?? 45);
+    $("o-screenglowint").textContent = String(cfg.screen_glow_intensity ?? 45);
     applyGlow(cfg);
     $("watchwords").value = cfg.watch_keywords || "";
     $("watchlist").value = cfg.watchlist || "";
@@ -1033,6 +1109,15 @@ function buildSettings(cfg) {
   bindRange("glowstrength", (v) => String(v), (v) => {
     settings.glow_strength = v;
     applyGlow(settings);
+  });
+
+  // Pulse on release rather than on every step: dragging the slider would
+  // otherwise retrigger the effect dozens of times a second.
+  bindRange("screenglowint", (v) => String(v), (v) => {
+    settings.screen_glow_intensity = v;
+  });
+  $("screenglowint").addEventListener("change", () => {
+    if (Number($("screenglowint").value) > 0) glowPulse(0.55, 1400);
   });
 
   document.querySelectorAll("#glowstyle .segbtn").forEach((btn) => {
@@ -1160,6 +1245,7 @@ function saveSettings() {
     card_glow: $("cardglowon").checked,
     card_glow_discount: Number($("cardglow").value),
     glow_strength: Number($("glowstrength").value),
+    screen_glow_intensity: Number($("screenglowint").value),
     glow_style: document.querySelector("#glowstyle .segbtn.on")?.dataset.style || "rainbow",
     glow_color: $("glowcolor").value,
     alert_score: Number($("alertscore").value),
