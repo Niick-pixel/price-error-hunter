@@ -11,7 +11,60 @@ is nothing to sign up for, and no data leaves the computer except the feed
 requests themselves — plus, if you turn them on, the alerts you choose to send
 to your own Discord or Telegram.
 
-## Running it
+## The desktop app (Windows)
+
+`dist\GlitchGuard\GlitchGuard.exe` is a portable build: GlitchGuard in its
+own window, with a tray icon, Windows notifications and a login item. No
+Python needed, no installer, and nothing written outside the folder except two
+per-user registry entries (the login item and the notification identity).
+
+**Why its own window.** The browser version runs as a tab, so its rendering
+competes with everything else in the browser - it was measured at 29% CPU and
+lagging the whole of Brave. The app uses Edge WebView2, built into Windows 11,
+in a separate process. Measured on the packaged build:
+
+| State | CPU (of the whole machine) |
+|---|---|
+| Window focused, glow drifting | 1.4% |
+| Window open, not focused | 1.1% |
+| Hidden in the tray | 0.09% |
+
+RAM is around 640 MB across 8 processes: WebView2's normal multi-process
+Chromium plus images for a hundred-odd cards.
+
+**Behaviour**
+
+- **Closing the window hides it to the tray** and keeps watching. Right-click
+  the tray icon and choose **Quit** to stop it completely; left-click reopens it.
+- **Only one copy ever runs.** Launching it again brings the existing window to
+  the front instead of starting a second poller, which would double every
+  request to every feed.
+- **Windows notifications** fire while the window is hidden or unfocused, and
+  clicking one opens the deal. While you are looking at the window, the
+  in-window card is used instead, so nothing rings twice.
+- **Start with Windows** launches it quietly into the tray at login. Toggle it in
+  Settings -> App or from the tray menu.
+- **Your data stays beside the exe** in `data\`. Zip the folder and move it
+  anywhere; the login item re-points itself the next time you launch it by hand.
+  Errors go to `data\glitchguard.log`, since there is no console.
+
+**Building it**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\build.ps1
+```
+
+This produces `dist\GlitchGuard\` and `dist\GlitchGuard-<version>-portable.zip`.
+Rebuilding never touches an existing `data\` folder. The zip is built from the
+clean PyInstaller output, so it **never contains your settings, history or
+tokens** and is safe to share.
+
+It is a one-folder build rather than one file: a single-file exe unpacks itself
+to a temp folder on every launch, which is slower to start and far more often
+flagged by antivirus as a false positive.
+
+## Running from source
+
 
 | Platform | Launcher |
 |---|---|
@@ -355,6 +408,55 @@ list will not show.
 
 ### Why the card ages were wrong
 
+### Where the minutes actually go
+
+Measured, because "the alert was late" has two very different causes and only
+one of them is ours.
+
+**Age at first sight**, per source — how old a deal already is the moment we
+first see it. This is publisher lag plus our own poll gap combined:
+
+| Source | Median age when first seen |
+|---|---|
+| Slickdeals front page | **2 min** |
+| TechBargains | **12 min** |
+| Walmart | 24 min |
+| Slickdeals popular | 180 min |
+| Woot | 240 min |
+
+Our own poll cycle runs at a measured median of **2.3 minutes** (2 min plus
+jitter), so we contribute roughly a minute on average. The rest belongs to the
+publisher: a deal that reaches us 13 minutes old spent about 11 of those
+minutes waiting to appear in the feed at all, and polling harder cannot recover
+time that elapsed before the item existed for us to fetch.
+
+Every alert now says which feed carried it and how old the deal already was —
+`TechBargains · posted 13 min ago` — so a late notification names the publisher
+responsible instead of looking like the app dawdled.
+
+**Alert from these sources** (Settings → When to alert) decides which feeds may
+interrupt you, separately from which feeds are polled. Each one is labelled
+with its own measured delay, taken from your database rather than assumed, so
+muting one is an informed choice. A muted feed's deals still appear in the
+list; they just stop ringing. **Pinned products ignore this entirely** — those
+were asked for by name.
+
+**If you want the fastest keyword alerts, the Slickdeals front page is the
+source that carries them soonest.** A product that only ever appears on
+TechBargains or CamelCamelCamel will arrive late no matter what, because that
+is when it is published.
+
+A per-keyword Slickdeals search feed was tested and rejected. The feeds exist
+and parse cleanly, and their coverage is excellent — 25 of 25 items matched
+`lego`, against the handful the front page carries — but they are ranked by
+relevance rather than date. The newest `lego` entry was 24 minutes old and the
+newest `xbox` entry **589 minutes** old, because a brand-new deal does not rank
+into the top 25 until it gains popularity. That is the same failure mode that
+makes the popular feed arrive three hours late, so it would have added
+coverage and more delay, not less.
+
+### posted_at precision
+
 The age on a card used to come from whatever the feed last claimed. Two feeds
 republish items with fresh timestamps, so **44 of 60 TechBargains rows were
 labelled "4 hr ago" while genuinely nine days old**, and the setting appeared to
@@ -362,7 +464,24 @@ do nothing. The label now derives from `posted_at`, fixed when a deal is first
 seen, which is also what the sort and the age limit read — so the three cannot
 disagree.
 
-## Four sections
+The stored time is now the feed's **exact `pubDate`** rather than a value
+parsed back out of that wording. The old path ran a round trip — real timestamp
+→ `"1 hr ago"` → parsed back to exactly 60 minutes — which threw away
+everything inside the hour bucket. Measured against 142 live TechBargains
+entries aged 1–24 hours, that round trip was off by a **median of 28.6 minutes,
+worst case 58.6**.
+
+That mattered most for alerting. **Only alert on deals posted within** defaults
+to 1 hour, and a deal genuinely 73 or 110 minutes old was recorded as exactly
+60, so it cleared a gate it should have failed. That is the mechanism behind
+alerts that pointed at something noticeably older than the limit allowed.
+
+The scraped listing has no timestamp to offer — it publishes wording like
+`2 hr ago` and nothing else — so it still goes through the text path. Feed
+clocks running ahead of ours are clamped to the present, since a deal posted in
+the future would read as "0 min ago" forever and sort above everything.
+
+## Five sections
 
 The tabs at the top split the app in two:
 
@@ -371,6 +490,7 @@ The tabs at the top split the app in two:
   a direct product link, and a real Amazon price-history chart.
 - **Woot** — Woot deals gathered from every source, not just the Woot feed.
 - **Walmart** — the same, for Walmart.
+- **Alerts** — every deal that actually notified you, newest first.
 
 A tab is a view over the same query rather than a separate fetch: one request
 returns the listing and all three counts, so a tab can never advertise a number
@@ -539,6 +659,45 @@ browser, where you can confirm the real price yourself.
 
 Filter by minimum discount, and sort by score, recency, discount or saving.
 
+## The Alerts tab
+
+A record of what interrupted you, rather than a category of product. Each card
+carries a chip saying **why** it fired — `Watched "lego"`, `Pinned product`, or
+`Possible price error` — and when the notification went out, which is a
+different number from when the deal was posted. Confusing those two is most of
+what made alert timing feel wrong.
+
+The tab keeps its own clock: **Hide deals older than** does not apply here, so
+a notification you have not read yet cannot disappear because the deal aged out
+of the listing. **Clear history** empties it without touching the deals.
+
+This is written by the poller at the moment it alerts, using an `alerted`
+column that existed in older databases but was missing from the migration list
+— so a fresh install never got it and nothing ever wrote to it. It is declared
+properly now, along with the reason, the keyword and the timestamp.
+
+## Stacked notifications
+
+Alerts arriving while you are looking at something else collect into one card
+rather than replacing each other. The newest is shown in full with a `+2` badge
+and a `+2 more · click to see all` line; clicking expands the rest into a list,
+one row per alert with its keyword and price, and each row opens its own deal.
+
+The first click on a stack **expands rather than opens** — opening the top one
+would discard everything underneath unseen. Dismissing clears the whole stack,
+because it is one notification containing several things and not several
+notifications sharing a card.
+
+Arriving at the Alerts tab retires the toast, and an alert that fires while
+that tab is open never raises one: the list is already on screen and says the
+same thing better.
+
+The stacked paper edges are `box-shadow` layers with zero blur and an insetting
+spread, not pseudo-elements. `.alert` is `position: fixed` with its own
+`z-index`, so it forms a stacking context, and a negative `z-index` child would
+paint on top of the card's own background instead of behind it — the same trap
+the card glow hit.
+
 ## Promo codes
 
 Plenty of deals need a code at checkout, and a deal whose code you never saw is
@@ -557,6 +716,48 @@ codes almost always mix letters and digits.
 That is deliberately conservative. Pulling any capitalised token out of a title
 produces far more matches, but most of them are junk — `FREE`, `NEW`, model
 numbers — and a Copy Code button that copies rubbish is worse than no button.
+
+## Price history
+
+Every price a product is seen at is recorded in a `price_history` table, keyed
+by ASIN. The deals table keeps one row per deal post with only its latest price,
+so the same product listed again next week would otherwise leave no trace of
+what it cost this week. Existing rows were backfilled once.
+
+A deal gains up to **+18 points** when it beats its own history: +8 for going
+below the lowest price previously seen, +10 more for being 40% or further below
+its usual (median) price. It needs at least two earlier sightings from *other*
+deal posts - one prior price is an anecdote, and a deal never counts as its own
+history.
+
+Worth being straight about: the history is thin to begin with. Over 33 days,
+12,713 rows carried an ASIN but only 251 products were seen more than once, and
+only 88 of those changed price. This signal starts rare and grows the longer
+the app runs.
+
+## Low-power mode
+
+Settings -> App. Stops every moving effect - the glow drift, the status ring,
+the screen-edge light - while keeping the static halos, which cost nothing once
+painted. Effects also pause automatically whenever the window is not focused,
+whatever this setting says.
+
+## Export
+
+**Export CSV** saves the current tab as a spreadsheet: the same rows, in the
+same order, with price, discount, score, promo code, source and link. In the
+desktop app it opens a Save dialog; in a browser it downloads.
+
+Cells that start with `=`, `+`, `-` or `@` are prefixed with an apostrophe.
+Product titles come from public feeds, and a cell starting that way would be run
+by Excel as a formula.
+
+## Updates
+
+On launch, one anonymous request to GitHub's public API checks whether a newer
+release exists; the result shows under Settings -> App as a link. Nothing is
+downloaded or installed automatically. Turn it off with **Check for updates on
+launch**.
 
 ## The price-error score
 

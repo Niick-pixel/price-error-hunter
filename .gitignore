@@ -2,3 +2,7 @@
 data/
 __pycache__/
 *.pyc
+# Build output. dist\GlitchGuard\data holds your settings and any Discord or
+# Telegram tokens, so the whole folder stays out of the repo.
+dist/
+build/
