@@ -50,6 +50,45 @@ def _open_log():
     sys.stdout = sys.stderr = log
 
 
+def _clear_download_marks():
+    """Unblock the app's own bundled DLLs so .NET will load them.
+
+    Unzipping a downloaded archive in Explorer tags every extracted file as
+    "from the internet" (a Zone.Identifier stream, ZoneId=3). The .NET
+    Framework refuses to load an assembly carrying that tag, so the window
+    layer - pywebview on pythonnet - failed to start with "Failed to resolve
+    Python.Runtime.Loader.Initialize" for anyone who downloaded the release,
+    while a locally built copy, which has no tag, worked.
+
+    This does what right-click -> Properties -> Unblock does, limited to .dll
+    files inside the app's own bundle. The executable keeps its tag, so
+    Windows still runs its SmartScreen check on it: by the time this code
+    runs, the user has already chosen to trust this download.
+    """
+    if not config.FROZEN:
+        return 0
+    cleared = 0
+    for folder, _dirs, files in os.walk(config.BUNDLE_DIR):
+        for name in files:
+            if name.lower().endswith(".dll"):
+                try:
+                    os.remove(os.path.join(folder, name) + ":Zone.Identifier")
+                    cleared += 1
+                except OSError:
+                    pass        # no tag on this file - the normal case
+    return cleared
+
+
+def _fatal(message):
+    """A readable dialog instead of a raw traceback, pointing at the log."""
+    try:
+        ctypes.windll.user32.MessageBoxW(
+            None, f"{message}\n\nDetails were written to:\n{LOG_FILE}",
+            "GlitchGuard could not start", 0x10)
+    except Exception:
+        pass
+
+
 def _single_instance():
     """True if this is the only copy running.
 
@@ -395,8 +434,16 @@ def main():
         # Another copy owns the feeds. Bring it forward and bow out.
         _wake_running_copy()
         return 0
+    cleared = _clear_download_marks()
+    if cleared:
+        print(f"Unblocked {cleared} bundled DLLs marked as downloaded.")
     _set_app_id()
-    return Shell(start_hidden).run()
+    try:
+        return Shell(start_hidden).run()
+    except Exception as exc:
+        traceback.print_exc()
+        _fatal(f"The app window failed to open.\n\n{type(exc).__name__}: {exc}")
+        return 1
 
 
 if __name__ == "__main__":
