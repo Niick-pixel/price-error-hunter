@@ -466,7 +466,12 @@
       if (this.gl) {
         this.gl.clear(this.gl.COLOR_BUFFER_BIT);
       }
-      this._raf = requestAnimationFrame(this._tick);
+      // Fully faded and nothing asked for: sleep. This used to schedule
+      // another frame here, forever, so an invisible full-screen canvas with
+      // plus-lighter blending made the compositor re-blend the whole window on
+      // every refresh - measured as most of the page's idle CPU. The state
+      // setter below wakes the loop again when there is something to show.
+      this._raf = 0;
       return;
     }
 
@@ -555,6 +560,14 @@
     this.amplitude = 0;
   };
 
+  /* Restart the render loop if it went to sleep. The clock is re-seeded so the
+     first frame after a long idle does not see a huge dt and jump. */
+  SiriGlow.prototype._wake = function () {
+    if (this._raf || this._destroyed || !this.gl || !this._tick) return;
+    this._last = performance.now();
+    this._raf = requestAnimationFrame(this._tick);
+  };
+
   SiriGlow.prototype.set = function (key, value) {
     this.opts[key] = value;
     if (this.fallbackEl && key === "radius") {
@@ -586,6 +599,7 @@
           this.fallbackEl.style.opacity =
             (v === "idle" || v === "exit") ? "0" : "1";
         }
+        this._wake();
       }
     });
   }

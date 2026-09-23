@@ -83,6 +83,24 @@ def _num(text):
         return None
 
 
+def _posted_ts(pub_date):
+    """The feed's exact posting time, as an epoch float.
+
+    Kept alongside age_text rather than derived from it. age_text is lossy by
+    design - it says "1 hr ago" for anything from 60 to 119 minutes - and the
+    stored posting time used to be parsed back out of that string, so a deal
+    could be recorded as up to 59 minutes younger or older than it really was.
+    That time drives the age on the card, the sort, and the alert age gate, so
+    the error showed up in all three.
+    """
+    if not pub_date:
+        return None
+    try:
+        return parsedate_to_datetime(pub_date).timestamp()
+    except (TypeError, ValueError):
+        return None
+
+
 def _age_text(pub_date):
     """RSS gives an absolute date; the UI wants '12 min ago'."""
     if not pub_date:
@@ -175,6 +193,7 @@ class CamelTopDrops:
                 "savings": _num(match.group("save")) or round(was - price, 2),
                 "image": entry["image"] or amazon_image(asin),
                 "age_text": _age_text(entry["pub_date"]),
+                "posted_at": _posted_ts(entry["pub_date"]),
                 "asin": asin,
                 "direct_url": f"https://www.amazon.com/dp/{asin}",
                 # ASIN and prices are already known, so no detail page is needed.
@@ -260,6 +279,7 @@ class Slickdeals:
                 # "w/ code XXXX" in the description, not the title.
                 "description": desc,
                 "age_text": _age_text(entry["pub_date"]),
+                "posted_at": _posted_ts(entry["pub_date"]),
                 "asin": asin,
                 "direct_url": f"https://www.amazon.com/dp/{asin}" if asin else "",
                 "detail_state": 1,
@@ -355,6 +375,7 @@ class TechBargains:
                 # Kept so promo codes can be detected later.
                 "description": entry["description"],
                 "age_text": _age_text(entry["pub_date"]),
+                "posted_at": _posted_ts(entry["pub_date"]),
                 "asin": asin,
                 "direct_url": f"https://www.amazon.com/dp/{asin}" if asin else link,
                 "detail_state": 1,

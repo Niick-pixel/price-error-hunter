@@ -252,15 +252,31 @@ h1 {
   width: 10px; height: 10px; border-radius: 50%;
   background: var(--ok);
   box-shadow: 0 0 0 0 rgba(111, 191, 139, .6);
+  position: relative;
+}
+/* The ring is a separate layer animated with transform and opacity only. It
+   used to animate box-shadow, which repaints on every frame - and because the
+   dot sits inside the sticky, blurred top bar, each repaint also forced that
+   whole bar to re-blur, 60 to 144 times a second, for as long as the page was
+   open. */
+.pulse::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(111, 191, 139, .55);
   animation: ping 2.4s infinite;
+  will-change: transform, opacity;
+  pointer-events: none;
 }
 .pulse.busy { background: var(--brand); }
-.pulse.bad { background: var(--error); animation: none; }
+.pulse.bad { background: var(--error); }
+.pulse.bad::after, .pulse.busy::after { animation: none; opacity: 0; }
 
 @keyframes ping {
-  0%   { box-shadow: 0 0 0 0 rgba(111, 191, 139, .55); }
-  70%  { box-shadow: 0 0 0 9px rgba(111, 191, 139, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(111, 191, 139, 0); }
+  0%   { transform: scale(1);    opacity: .9; }
+  70%  { transform: scale(2.8);  opacity: 0; }
+  100% { transform: scale(2.8);  opacity: 0; }
 }
 
 .btn {
@@ -547,8 +563,43 @@ a.linkbtn { text-decoration: none; display: inline-flex; align-items: center; }
 
 /* The pinned list is one entry per line, so it needs to be a textarea while
    still looking like the single-line inputs beside it. */
+/* ---------- low power ----------
+   Two levels. "unfocused" is automatic and temporary: the window is in the
+   background, so nothing needs to move. "lowpower" is the user's choice and
+   also removes entrance animations. Neither removes the static halos - once
+   painted they cost nothing, and they are what makes a big discount findable.
+
+   Pausing rather than removing the drift keeps each halo on the hue it had,
+   so regaining focus does not make every card flash to a new colour. */
+html.unfocused .card.glow::before,
+html.unfocused .pulse::after,
+html.unfocused .skel .sk-thumb::after,
+html.unfocused .skel .sk-line::after {
+  animation-play-state: paused;
+}
+html.lowpower .card.glow::before,
+html.lowpower .pulse::after,
+html.lowpower .skel .sk-thumb::after,
+html.lowpower .skel .sk-line::after { animation: none; }
+html.lowpower .card.reveal { transition: none !important; opacity: 1 !important; transform: none !important; }
+html.lowpower .card,
+html.lowpower .card:hover { transition: none; }
+
 /* Two-option segmented control, with the colour well tucked on the end so the
    choice and the value it needs sit on one line. */
+/* Measured delay beside a source toggle. Slow feeds are tinted so the list can
+   be read at a glance rather than compared number by number. */
+.lagtag {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  opacity: .85;
+  margin-left: 6px;
+  white-space: nowrap;
+}
+.lagtag.slow { color: var(--error); opacity: 1; }
+.lagtag:empty { display: none; }
+
 .seg {
   display: inline-flex;
   align-items: center;
@@ -756,6 +807,143 @@ body.modal-open { overflow: hidden; }
 .alertkicker.watch { color: var(--toast-kicker-watch); }
 .alertmeta { font-size: 12px; color: var(--toast-ink-dim); margin-top: 3px; }
 
+/* Why this deal interrupted you, shown on its card in the Alerts tab. Three
+   reasons, three weights: a word you chose outranks a score the app computed,
+   and a pinned product outranks both. */
+.reasonchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 8px;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+.reasonchip.keyword {
+  background: rgba(209, 154, 94, .16);
+  color: var(--honey-text);
+  border: 1px solid rgba(209, 154, 94, .45);
+}
+.reasonchip.pinned {
+  background: rgba(233, 162, 60, .18);
+  color: var(--amber-text);
+  border: 1px solid rgba(233, 162, 60, .5);
+}
+.reasonchip.score {
+  background: rgba(217, 105, 74, .16);
+  color: var(--terracotta);
+  border: 1px solid rgba(217, 105, 74, .45);
+}
+html[data-mode="light"] .reasonchip.keyword { background: rgba(138, 95, 51, .10); }
+html[data-mode="light"] .reasonchip.pinned  { background: rgba(162, 99, 26, .12); }
+html[data-mode="light"] .reasonchip.score   { background: rgba(176, 68, 42, .10); }
+
+.alertwhen { font-size: 10.5px; color: var(--muted); margin-left: 6px; }
+
+/* Stacked notifications. Two paper edges peeking out below the card say
+   "there are more of these" without spending vertical space on them.
+
+   box-shadow rather than pseudo-elements: .alert is position:fixed with its
+   own z-index, so it forms a stacking context, and a negative z-index child
+   would paint on top of the card's own background instead of behind it. A
+   shadow paints strictly outside the border box, which is what this needs.
+   Each layer is a hard edge - zero blur, a spread that insets it - so it reads
+   as another card behind rather than as a soft glow. */
+.alert.stacked {
+  box-shadow:
+    0 6px 0 -1px var(--toast-bg),
+    0 6px 0 0 var(--border-strong),
+    0 12px 0 -3px var(--toast-bg),
+    0 12px 0 -2px var(--border-strong),
+    0 20px 60px rgba(0, 0, 0, .6);
+}
+
+.alertcount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 6px;
+  margin-left: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--amber);
+  color: #2a1b06;
+  font-size: 10.5px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+html[data-mode="light"] .alertcount { color: #fdf6ea; }
+
+/* Expanded list: one row per pending alert, each its own click target. */
+.alertlist {
+  margin: 10px -4px -2px;
+  max-height: 46vh;
+  overflow-y: auto;
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+}
+.alertrow {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  font: inherit;
+  color: var(--toast-ink);
+  padding: 7px 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background .2s var(--ease);
+}
+.alertrow:hover { background: var(--glass-edge); }
+.alertrow .rtitle {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.alertrow .rwhy {
+  flex-shrink: 0;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--toast-kicker);
+}
+.alertrow .rprice {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--toast-ink);
+}
+
+.alertmore {
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--toast-kicker);
+}
+
+/* Provenance line: quieter than the meta above it, because it explains the
+   alert rather than describing the deal. */
+.alertvia {
+  font-size: 10.5px;
+  letter-spacing: .04em;
+  color: var(--toast-ink-dim);
+  opacity: .82;
+  margin-top: 4px;
+}
+
 .alertclose {
   background: none;
   border: none;
@@ -854,12 +1042,17 @@ body.modal-open { overflow: hidden; }
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  overflow: hidden;
   cursor: pointer;
-  /* saturate() is the part that makes a blur read as glass rather than fog:
-     colours behind the surface stay vivid instead of washing grey. */
-  backdrop-filter: saturate(180%) blur(var(--glass-blur));
-  -webkit-backdrop-filter: saturate(180%) blur(var(--glass-blur));
+  /* No backdrop-filter and no overflow clip, both deliberately.
+
+     A blur on every card made each one its own offscreen render surface -
+     over a hundred of them - re-blurred whenever anything beneath changed.
+     What sits behind a card is the page's own smooth gradient, and blurring a
+     smooth gradient changes nothing you can see, so the cost bought nothing.
+
+     The clip existed to round the thumbnail's corners; .thumb now rounds its
+     own. Dropping it is what lets the glow live on a pseudo-element, which is
+     what lets it animate on the GPU. */
   box-shadow: var(--shadow-soft), inset 0 1px 0 var(--glass-edge);
   transition: transform .5s var(--spring), border-color .3s var(--ease),
               box-shadow .45s var(--ease-out), background .3s var(--ease);
@@ -879,6 +1072,8 @@ body.modal-open { overflow: hidden; }
   background: var(--panel-2);
   height: 172px;
   overflow: hidden;
+  /* Rounds itself now that the card no longer clips its children. */
+  border-radius: calc(var(--radius) - 1px) calc(var(--radius) - 1px) 0 0;
   transition: background .3s var(--ease);
 }
 .card .thumb.hasimg { background: var(--thumb-bg); }
@@ -952,30 +1147,41 @@ body.modal-open { overflow: hidden; }
   --g4: rgb(var(--glow-h4) / var(--glow-a));
   --glow-neg: calc(var(--glow-off) * -1);
   border-color: rgba(255, 255, 255, .22);
-  animation: cardAurora 14s linear infinite;
 }
 html[data-mode="light"] .card.glow { border-color: rgba(15, 23, 42, .20); }
 
-@keyframes cardAurora {
-  0%, 100% {
-    box-shadow: var(--glow-neg) var(--glow-neg) var(--glow-blur) var(--glow-spread) var(--g1),
-                var(--glow-off) var(--glow-neg) var(--glow-blur) var(--glow-spread) var(--g2),
-                var(--glow-off) var(--glow-off) var(--glow-blur) var(--glow-spread) var(--g3),
-                var(--glow-neg) var(--glow-off) var(--glow-blur) var(--glow-spread) var(--g4);
-  }
-  33% {
-    box-shadow: var(--glow-neg) var(--glow-neg) var(--glow-blur) var(--glow-spread) var(--g4),
-                var(--glow-off) var(--glow-neg) var(--glow-blur) var(--glow-spread) var(--g1),
-                var(--glow-off) var(--glow-off) var(--glow-blur) var(--glow-spread) var(--g2),
-                var(--glow-neg) var(--glow-off) var(--glow-blur) var(--glow-spread) var(--g3);
-  }
-  66% {
-    box-shadow: var(--glow-neg) var(--glow-neg) var(--glow-blur) var(--glow-spread) var(--g3),
-                var(--glow-off) var(--glow-neg) var(--glow-blur) var(--glow-spread) var(--g4),
-                var(--glow-off) var(--glow-off) var(--glow-blur) var(--glow-spread) var(--g1),
-                var(--glow-neg) var(--glow-off) var(--glow-blur) var(--glow-spread) var(--g2);
-  }
+/* The halo. A static four-corner box-shadow on a transparent layer the size of
+   the card - only the shadow is visible, and it paints strictly outside the
+   box, so it reads as light behind the card.
+
+   The drift is now a hue-rotate on that layer rather than a box-shadow
+   animation. Animating box-shadow repaints on the main thread every frame,
+   for every glowing card, and each repaint invalidated the blur of everything
+   near it; a filter on its own layer is composited on the GPU and costs
+   nothing on the main thread. It reads the same: four distinct hues around
+   the card, all travelling slowly round the colour wheel. */
+.card.glow::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow:
+    var(--glow-neg) var(--glow-neg) var(--glow-blur) var(--glow-spread) var(--g1),
+    var(--glow-off) var(--glow-neg) var(--glow-blur) var(--glow-spread) var(--g2),
+    var(--glow-off) var(--glow-off) var(--glow-blur) var(--glow-spread) var(--g3),
+    var(--glow-neg) var(--glow-off) var(--glow-blur) var(--glow-spread) var(--g4);
+  animation: glowHue 14s linear infinite;
+  will-change: filter;
 }
+
+@keyframes glowHue {
+  from { filter: hue-rotate(0deg); }
+  to   { filter: hue-rotate(360deg); }
+}
+
+/* A single chosen colour must stay that colour, so it does not drift. */
+html[data-glow="solid"] .card.glow::before { animation: none; }
 
 /* The light also falls on the front of the card, not only behind it. Four
    corner blooms inside the border box, screened over the surface in dark mode
@@ -1004,16 +1210,15 @@ html[data-mode="light"] .card.glow { border-color: rgba(15, 23, 42, .20); }
    the blend mode would tint the title and the price too. */
 .card .thumb, .card .body { position: relative; z-index: 1; }
 
-/* Hover lifts the bloom rather than switching to a different look. Pausing the
-   rotation keeps the hue under the pointer still while it is being read. */
+/* Hover lifts the bloom and holds the hue still while the card is read. */
 .card.glow:hover {
   --glow-a: calc(var(--glow-a-base) + .18);
   --glow-front: calc(var(--glow-front-base) + .06);
-  animation-play-state: paused;
 }
+.card.glow:hover::before { animation-play-state: paused; }
 
 @media (prefers-reduced-motion: reduce) {
-  .card.glow { animation-play-state: paused; }
+  .card.glow::before { animation: none; }
 }
 
 /* A slow zoom on hover, the way Apple treats product photography. */
@@ -1045,8 +1250,6 @@ html[data-mode="light"] .card.glow { border-color: rgba(15, 23, 42, .20); }
   font-size: var(--fs-micro);
   font-weight: 650;
   letter-spacing: .04em;
-  backdrop-filter: saturate(180%) blur(12px);
-  -webkit-backdrop-filter: saturate(180%) blur(12px);
 }
 
 .badge .score {
@@ -1055,7 +1258,8 @@ html[data-mode="light"] .card.glow { border-color: rgba(15, 23, 42, .20); }
 }
 
 .badge.normal {
-  background: rgba(10, 14, 30, .55);
+  /* A touch more opaque to make up for the blur it no longer has. */
+  background: rgba(24, 19, 13, .74);
   color: var(--text);
   border: 1px solid var(--glass-edge);
 }
@@ -1092,8 +1296,6 @@ html[data-mode="light"] .badge.strong {
   padding: 4px 8px;
   border-radius: var(--radius-pill);
   letter-spacing: var(--tracking-wide);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
 }
 html[data-mode="light"] .newflag {
   background: rgba(138, 95, 51, .12);

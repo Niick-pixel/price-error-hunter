@@ -44,6 +44,10 @@
     <span class="tabname">Walmart</span>
     <span class="tabcount" id="count-walmart">—</span>
   </button>
+  <button class="tab" data-view="alerts">
+    <span class="tabname">Alerts</span>
+    <span class="tabcount" id="count-alerts">—</span>
+  </button>
   <button class="tab tabsettings" data-view="settings">
     <span class="tabname">Settings</span>
   </button>
@@ -109,6 +113,8 @@
     </label>
   </div>
   <div class="counts" id="counts"></div>
+  <button id="exportcsv" class="btn" type="button" title="Save this tab as a spreadsheet">Export CSV</button>
+  <button id="clearalerts" class="btn alertsopt hidden" type="button">Clear history</button>
 </section>
 
 <p id="amazonnote" class="note hidden"></p>
@@ -180,6 +186,48 @@
   </div>
 
   <div class="setcard">
+    <h3>App</h3>
+    <p class="setintro">
+      How GlitchGuard behaves on this machine.
+    </p>
+
+    <label class="toggle setinline">
+      <input type="checkbox" id="lowpower">
+      <span>Low-power mode</span>
+    </label>
+    <p class="sethint" style="margin-top:4px">
+      Stops every moving effect - the glow drift, the status ring and the
+      screen-edge light - while keeping the halos. Effects already pause on
+      their own whenever this window is not focused.
+    </p>
+
+    <div id="desktopopts" class="hidden">
+      <label class="toggle setinline" style="margin-top:14px">
+        <input type="checkbox" id="autostart">
+        <span>Start with Windows</span>
+      </label>
+      <label class="toggle setinline">
+        <input type="checkbox" id="nativetoasts">
+        <span>Windows notifications while hidden</span>
+      </label>
+      <div class="setrow" style="margin:10px 0 0">
+        <button class="btn" id="testtoast" type="button">Send a test notification</button>
+        <span id="testtoastresult" class="sethint" style="margin-left:10px"></span>
+      </div>
+      <p class="sethint" style="margin-top:8px">
+        Closing the window keeps GlitchGuard watching from the system tray.
+        Quit from the tray icon to stop it completely.
+      </p>
+    </div>
+
+    <label class="toggle setinline" style="margin-top:14px">
+      <input type="checkbox" id="checkupdates">
+      <span>Check for updates on launch</span>
+    </label>
+    <p class="sethint" id="versionline" style="margin-top:4px">Version -</p>
+  </div>
+
+  <div class="setcard">
     <h3>When to alert</h3>
     <p class="setintro">
       Two independent gates. A find has to be strong enough <em>and</em> recent
@@ -212,6 +260,19 @@
 
     <p class="sethint">
       Hidden product types never raise an alert, whatever they score.
+    </p>
+
+    <div class="setrow" style="margin-top:18px">
+      <label class="setlabel">
+        Alert from these sources
+        <span class="setnote">a feed worth listing is not always worth interrupting for — the figure is each one's measured delay</span>
+      </label>
+      <div id="alertsources" class="catlist"></div>
+    </div>
+    <p class="sethint">
+      Most of the gap between a deal going up and an alert arriving belongs to
+      the feed that carried it, not to the app. Unticking a slow feed keeps its
+      deals in the list but stops them ringing. Pinned products ignore this.
     </p>
   </div>
 

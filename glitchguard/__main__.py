@@ -3,7 +3,7 @@ import sys
 import threading
 import webbrowser
 
-from . import config, poller, server
+from . import config, poller, server, updates
 
 
 def main():
@@ -25,6 +25,8 @@ def main():
         return 1
 
     engine.start()
+    if cfg.get("check_updates", True):
+        updates.check_async()
     url = f"http://127.0.0.1:{port}/?t={server.TOKEN}"
     print("GlitchGuard is running.")
     print(f"  {url}")

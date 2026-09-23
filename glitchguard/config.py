@@ -1,10 +1,22 @@
 import json
 import os
+import sys
 import threading
 
-APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Packaged, the executable's folder is the app folder, so data/ sits beside
+# GlitchGuard.exe and the whole thing stays portable: zip the folder, move it,
+# and the settings and deal history go with it. The read-only web assets are
+# unpacked by PyInstaller into its bundle directory instead.
+FROZEN = bool(getattr(sys, "frozen", False))
+if FROZEN:
+    APP_DIR = os.path.dirname(os.path.abspath(sys.executable))
+    BUNDLE_DIR = getattr(sys, "_MEIPASS", APP_DIR)
+else:
+    APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    BUNDLE_DIR = APP_DIR
 DATA_DIR = os.path.join(APP_DIR, "data")
-WEB_DIR = os.path.join(APP_DIR, "web")
+WEB_DIR = os.path.join(BUNDLE_DIR, "web")
+ASSETS_DIR = os.path.join(BUNDLE_DIR, "assets")
 CONFIG_PATH = os.path.join(DATA_DIR, "settings.json")
 DB_PATH = os.path.join(DATA_DIR, "deals.db")
 
@@ -56,6 +68,15 @@ DEFAULTS = {
     "source_woot": True,
     "source_walmart": True,
     "source_techbargains": True,
+    # Which sources may raise an alert. A source can be worth listing without
+    # being worth interrupting for: the popularity-ranked feeds surface deals
+    # hours after they go up, so a fresh-sounding alert from one is a fiction.
+    # Defaults to every source, so behaviour is unchanged until this is edited.
+    # Pinned products ignore this entirely - those were asked for by name.
+    "alert_sources": [
+        "hiddenclearances", "camelcamelcamel", "slickdeals",
+        "slickdeals_popular", "woot", "walmart", "techbargains",
+    ],
     # Product types to hide. Books are on by default because Kindle price drops
     # otherwise dominate the Amazon feeds.
     "excluded_categories": ["books"],
@@ -71,6 +92,18 @@ DEFAULTS = {
     "discord_webhook": "",
     "telegram_token": "",
     "telegram_chat_id": "",
+    # Desktop build. Low power stops every continuous animation - the glow
+    # drift, the status ring and the screen-edge overlay - leaving static
+    # halos, which cost nothing once painted. Effects also pause on their own
+    # whenever the window is not focused, whatever this says.
+    "low_power": False,
+    # Launch into the tray at login. Only acted on by the packaged app: from
+    # source there is no stable executable path to register.
+    "autostart": True,
+    # Windows toast notifications while the window is hidden or minimised.
+    "native_toasts": True,
+    # One anonymous request to GitHub per launch to see if a release is newer.
+    "check_updates": True,
     # Maximum age of a listed deal, measured from when it was posted - the same
     # figure shown on the card, so the two can never disagree.
     "deal_ttl_hours": 12,

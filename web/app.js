@@ -143,6 +143,9 @@ function applyGlow(cfg) {
   const vars = glowVars(cfg.glow_strength ?? 70);
   Object.entries(vars).forEach(([k, v]) => root.style.setProperty(k, v));
 
+  // Read by CSS to stop the hue drift - a chosen colour must stay that colour.
+  root.dataset.glow = style;
+
   const triple = style === "solid" ? hexTriple(cfg.glow_color) : null;
   for (const n of [1, 2, 3, 4]) {
     // Clearing the override lets each theme's own hues come back, which
@@ -170,7 +173,8 @@ let screenGlow = null;
 let glowTimer = null;
 
 function initScreenGlow() {
-  if (screenGlow || !window.SiriGlow) return;
+  // Low power never creates the WebGL context at all.
+  if (screenGlow || !window.SiriGlow || settings.low_power) return;
   try {
     // Tuned well below the library defaults, which are built for a full-screen
     // assistant effect where the glow IS the interface. Here it is a signal
@@ -202,7 +206,7 @@ function screenGlowScale() {
 }
 
 function glowPulse(amplitude, holdMs) {
-  if (!screenGlow || !settings.screen_glow) return;
+  if (!screenGlow || !settings.screen_glow || settings.low_power) return;
   const scale = screenGlowScale();
   if (scale <= 0) return;
   clearTimeout(glowTimer);
@@ -296,6 +300,21 @@ function buildCard(deal) {
 
   // body
   const body = el("div", "body");
+
+  // Only in the Alerts tab: elsewhere this would be noise on every card, and
+  // here it is the entire reason the card is in the list.
+  if (view === "alerts" && deal.alert_reason) {
+    const why = deal.alert_reason;
+    const label = why === "keyword" && deal.alert_keyword
+      ? `Watched “${deal.alert_keyword}”`
+      : why === "pinned" ? "Pinned product"
+      : why === "keyword" ? "Watched keyword" : "Possible price error";
+    const chip = el("div", `reasonchip ${why}`, label);
+    if (deal.alerted_at) {
+      chip.append(el("span", "alertwhen", notifiedWords(deal.alerted_at)));
+    }
+    body.append(chip);
+  }
   const line = el("div", "retailerline");
   line.append(el("span", "retailer", deal.retailer || "Unknown"));
   line.append(el("span", "srctag", SOURCE_LABEL[deal.source] || deal.source || "feed"));
@@ -755,6 +774,10 @@ function render(deals) {
 }
 
 function applyStatus(status) {
+  if (status.desktop && !desktopInfo) {
+    desktopInfo = status.desktop;
+    $("desktopopts").classList.remove("hidden");
+  }
   const pulse = $("pulse");
   pulse.className = "pulse" + (status.last_error ? " bad" : status.running ? " busy" : "");
 
@@ -826,25 +849,100 @@ function soundOnlyPing(status) {
 /* The alert used to be an unlabelled bar that only marked things read, which is
    why clicking it appeared to do nothing. It now opens the deal, and dismissing
    is a separate control so the two actions cannot be confused. */
+/* "posted 12 min ago" reads better than a bare number, and the distinction
+   between a deal that went up two minutes ago and one that went up three hours
+   ago is the whole point of showing it. */
+/* When the notification fired, as opposed to when the deal was posted. The
+   two are different numbers and confusing them is the whole reason the Alerts
+   tab exists. */
+function notifiedWords(stamp) {
+  const mins = Math.max(0, Math.round((Date.now() / 1000 - stamp) / 60));
+  if (mins < 1) return "notified just now";
+  if (mins < 60) return `notified ${mins} min ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `notified ${hrs} hr ago`;
+  return `notified ${Math.floor(hrs / 24)} d ago`;
+}
+
+function ageWords(minutes) {
+  if (minutes < 1) return "posted just now";
+  if (minutes < 60) return `posted ${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `posted ${hours} hr ago`;
+  return `posted ${Math.floor(hours / 24)} d ago`;
+}
+
+/* Pending notifications, newest last. They accumulate while you are looking at
+   something else and collapse into one stacked card, because six toasts in a
+   row is six things to dismiss and no way to see what you missed.
+
+   Cleared on dismiss, and on arriving at the Alerts tab - once the list is on
+   screen the toast has nothing left to tell you. */
+let alertQueue = [];
+let alertExpanded = false;
+
+function queueAlert(payload, keyword) {
+  if (!payload || !payload.id) return;
+  const entry = { ...payload, keyword: keyword || null };
+  const at = alertQueue.findIndex((a) => a.id === entry.id);
+  if (at >= 0) alertQueue.splice(at, 1);      // re-alerted: move to the front
+  alertQueue.push(entry);
+  // A runaway feed must not build an unbounded list in memory.
+  if (alertQueue.length > 40) alertQueue = alertQueue.slice(-40);
+}
+
+function alertReasonWords(entry) {
+  if (entry.keyword === "pinned") return "Pinned";
+  if (entry.keyword) return `“${entry.keyword}”`;
+  return "Price error";
+}
+
 function renderAlert(top, keyword) {
   const alert = $("alert");
   if (!top) {
-    alert.classList.add("hidden");
-    lastAlertId = null;
+    // Only an empty queue hides the card: a stack outlives the status payload
+    // that last mentioned any one of its members.
+    if (!alertQueue.length) {
+      alert.classList.add("hidden");
+      lastAlertId = null;
+    }
     return;
   }
 
   // A watch hit has already made its own sound and glow; do not repeat them.
   if (!keyword && top.id !== lastAlertId) {
     lastAlertId = top.id;
-    if (settings.sound_alerts) chime();
+    if (settings.sound_alerts && !toastCovers()) chime();
     notifyDesktop(top);
     // Brightness tracks how strong the find is.
     glowPulse(0.32 + 0.26 * Math.min(1, (top.score || 0) / 100), 5000);
   }
   if (keyword) lastAlertId = top.id;
 
+  queueAlert(top, keyword);
+  // Standing in front of the list already: nothing to pop up about.
+  if (view === "alerts") {
+    alertQueue = [];
+    alert.classList.add("hidden");
+    return;
+  }
+  drawAlertCard();
+}
+
+/* Draws whatever is currently queued: the newest on top, with the rest either
+   hinted at as a stack or listed in full once expanded. */
+function drawAlertCard() {
+  const alert = $("alert");
+  if (!alertQueue.length) {
+    alert.classList.add("hidden");
+    return;
+  }
+  const top = alertQueue[alertQueue.length - 1];
+  const keyword = top.keyword === "pinned" ? null : top.keyword;
+  const extra = alertQueue.length - 1;
+
   alert.classList.remove("hidden");
+  alert.classList.toggle("stacked", extra > 0 && !alertExpanded);
   alert.replaceChildren();
 
   if (top.image) {
@@ -862,6 +960,7 @@ function renderAlert(top, keyword) {
     : `Possible price error · ${Math.round(top.score)}/100`;
   const kickerEl = el("span", "alertkicker", kicker);
   if (keyword) kickerEl.classList.add("watch");
+  if (extra > 0) kickerEl.append(el("span", "alertcount", `+${extra}`));
   body.append(kickerEl);
   body.append(el("span", "alerttitle", top.title));
   const bits = [];
@@ -870,6 +969,40 @@ function renderAlert(top, keyword) {
   if (top.discount_pct) bits.push(`${Math.round(top.discount_pct)}% off`);
   bits.push("Click to open →");
   body.append(el("div", "alertmeta", bits.join(" · ")));
+
+  // Provenance on its own line. Most of the delay between a deal going up and
+  // this card appearing belongs to the feed that carried it, so naming the
+  // feed and the age makes a "late" alert legible rather than mysterious.
+  const via = [];
+  if (top.source) via.push(SOURCE_NAMES[top.source] || top.source);
+  if (typeof top.age_minutes === "number") via.push(ageWords(top.age_minutes));
+  if (via.length) body.append(el("div", "alertvia", via.join(" · ")));
+
+  if (extra > 0 && !alertExpanded) {
+    body.append(el("div", "alertmore", `+${extra} more · click to see all`));
+  } else if (extra > 0) {
+    const list = el("div", "alertlist");
+    // Newest first, and the one already shown above is not repeated.
+    alertQueue.slice(0, -1).reverse().forEach((entry) => {
+      const row = el("button", "alertrow");
+      row.type = "button";
+      row.append(el("span", "rwhy", alertReasonWords(entry)));
+      row.append(el("span", "rtitle", entry.title || "Untitled"));
+      if (typeof entry.price === "number") {
+        row.append(el("span", "rprice", money(entry.price)));
+      }
+      row.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const url = safeUrl(entry.url);
+        if (url) window.open(url, "_blank", "noopener,noreferrer");
+        alertQueue = alertQueue.filter((a) => a.id !== entry.id);
+        if (alertQueue.length <= 1) alertExpanded = false;
+        drawAlertCard();
+      });
+      list.append(row);
+    });
+    body.append(list);
+  }
   alert.append(body);
 
   const close = el("button", "alertclose", "×");
@@ -881,6 +1014,13 @@ function renderAlert(top, keyword) {
   alert.append(close);
 
   alert.onclick = () => {
+    // With more than one pending, the first click is "show me what I missed"
+    // rather than "open this one" - opening would discard the rest unseen.
+    if (alertQueue.length > 1 && !alertExpanded) {
+      alertExpanded = true;
+      drawAlertCard();
+      return;
+    }
     const url = safeUrl(top.url);
     if (url) window.open(url, "_blank", "noopener,noreferrer");
     dismissAlert();
@@ -888,6 +1028,10 @@ function renderAlert(top, keyword) {
 }
 
 async function dismissAlert() {
+  // Dismiss means all of them: the stack is one notification with several
+  // things in it, not several notifications sharing a card.
+  alertQueue = [];
+  alertExpanded = false;
   $("alert").classList.add("hidden");
   const ids = (window.__deals || []).filter((d) => d.is_new).map((d) => d.id);
   await api("/api/seen", { method: "POST", body: JSON.stringify({ ids }) }).catch(() => {});
@@ -907,7 +1051,7 @@ function watchAlert(status) {
 
   const hit = status.watch_hit;
   if (!hit) return false;
-  if (settings.sound_alerts) chime("watch");
+  if (settings.sound_alerts && !toastCovers()) chime("watch");
   notifyDesktop({ ...hit, title: `“${hit.keyword}” — ${hit.title}` });
   renderAlert(hit, hit.keyword);
   glowPulse(0.6, 6000);
@@ -963,7 +1107,20 @@ function chime(kind) {
   }, { once: true })
 );
 
+let desktopInfo = null;   // filled from /api/status when running in the app window
+
+/* In the app window, while it is not focused, the shell raises a Windows
+   toast - which makes its own sound. Chiming here too would ring twice for
+   one find. Focused, the toast is suppressed and the chime is the sound. */
+function toastCovers() {
+  return !!desktopInfo && settings.native_toasts !== false
+    && document.documentElement.classList.contains("unfocused");
+}
+
 function notifyDesktop(top) {
+  // Inside the desktop app the Python side raises real Windows toasts, so a
+  // second notification from the page would only duplicate it.
+  if (desktopInfo) return;
   if (!("Notification" in window) || Notification.permission !== "granted") return;
   try {
     const note = new Notification("Possible price error", {
@@ -1000,6 +1157,12 @@ function applySettings(cfg) {
     $("glowstrength").value = String(cfg.glow_strength ?? 70);
     $("o-glowstrength").textContent = String(cfg.glow_strength ?? 70);
     $("glowcolor").value = cfg.glow_color || "#e9a23c";
+    $("lowpower").checked = !!cfg.low_power;
+    $("autostart").checked = cfg.autostart !== false;
+    $("nativetoasts").checked = cfg.native_toasts !== false;
+    $("checkupdates").checked = cfg.check_updates !== false;
+    applyLowPower(!!cfg.low_power);
+    refreshVersion();
     $("screenglowint").value = String(cfg.screen_glow_intensity ?? 45);
     $("o-screenglowint").textContent = String(cfg.screen_glow_intensity ?? 45);
     applyGlow(cfg);
@@ -1049,6 +1212,18 @@ function selectedCategories() {
 
 /* ---------- settings tab ---------- */
 
+// Feed key -> human name. The alert prints this so a late notification says
+// which publisher was slow instead of looking like the app dawdled.
+const SOURCE_NAMES = {
+  hiddenclearances: "Hidden Clearances",
+  camelcamelcamel: "Camel top drops",
+  slickdeals: "Slickdeals",
+  slickdeals_popular: "Slickdeals popular",
+  woot: "Woot",
+  walmart: "Walmart",
+  techbargains: "TechBargains",
+};
+
 const SOURCE_KEYS = [
   ["source_hiddenclearances", "Hidden Clearances"],
   ["source_camelcamelcamel", "Camel top drops"],
@@ -1079,6 +1254,27 @@ function buildSettings(cfg) {
       saveSettings();
     });
     swatches.append(b);
+  });
+
+  const alertList = $("alertsources");
+  const allowed = Array.isArray(cfg.alert_sources) ? cfg.alert_sources : null;
+  SOURCE_KEYS.forEach(([key, label]) => {
+    const name = key.replace(/^source_/, "");
+    const on = allowed === null || allowed.includes(name);
+    const pill = el("label", "catpill" + (on ? " on" : ""));
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.checked = on;
+    input.dataset.source = name;
+    input.addEventListener("change", () => {
+      pill.classList.toggle("on", input.checked);
+      saveSettings();
+    });
+    pill.append(input, el("span", "tick", "✓"), el("span", null, label));
+    const lag = el("span", "lagtag", "");
+    lag.id = `lag-${name}`;
+    pill.append(lag);
+    alertList.append(pill);
   });
 
   const list = $("sourcelist");
@@ -1155,6 +1351,28 @@ function bindRange(id, fmtFn, apply) {
   input.addEventListener("change", saveSettings);
 }
 
+/* Printed next to each source so muting one is an informed decision rather
+   than a guess. Absent until enough rows exist to have a real median. */
+function renderSourceLatency(stats) {
+  if (!stats) return;
+  Object.entries(stats).forEach(([name, minutes]) => {
+    const tag = document.getElementById(`lag-${name}`);
+    if (!tag) return;
+    tag.textContent = minutes < 60
+      ? `~${Math.round(minutes)} min behind`
+      : `~${(minutes / 60).toFixed(1)} hr behind`;
+    tag.classList.toggle("slow", minutes >= 30);
+  });
+}
+
+function selectedAlertSources() {
+  const out = [];
+  document.querySelectorAll("#alertsources input").forEach((i) => {
+    if (i.checked) out.push(i.dataset.source);
+  });
+  return out;
+}
+
 function selectedSources() {
   const out = {};
   document.querySelectorAll("#sourcelist input").forEach((i) => {
@@ -1173,6 +1391,9 @@ async function load() {
     const data = await api(`/api/deals?${params}`);
     renderCategories(data.categories, data.settings.excluded_categories);
     applySettings(data.settings);
+    // Must follow applySettings: its first call is what builds the source
+    // pills these figures are written into.
+    renderSourceLatency(data.source_latency);
     applyStatus(data.status);
     render(data.deals);
     applyTabCounts(data.counts);
@@ -1209,13 +1430,133 @@ function setView(next) {
   document.querySelectorAll(".amazonopt").forEach((n) =>
     n.classList.toggle("hidden", next !== "amazon")
   );
+  document.querySelectorAll(".alertsopt").forEach((n) =>
+    n.classList.toggle("hidden", next !== "alerts")
+  );
+  // The list is the better version of the toast, so opening it retires one.
+  if (next === "alerts") {
+    alertQueue = [];
+    alertExpanded = false;
+    $("alert").classList.add("hidden");
+  }
   openId = null;
+  // The reason chip is baked into the card at build time and only appears in
+  // this tab, so a card cached while another tab was open is the wrong shape.
+  cardCache.clear();
   load();
 }
 
 document.querySelectorAll(".tab").forEach((t) =>
   t.addEventListener("click", () => setView(t.dataset.view))
 );
+
+$("clearalerts").addEventListener("click", async () => {
+  const btn = $("clearalerts");
+  btn.disabled = true;
+  try {
+    await api("/api/alerts/clear", { method: "POST", body: "{}" });
+    await load();
+  } catch {
+    $("laststate").textContent = "could not clear the alert history";
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+/* ---------- low power & focus ---------- */
+function applyLowPower(on) {
+  settings.low_power = on;
+  document.documentElement.classList.toggle("lowpower", on);
+  if (on && screenGlow) {
+    // Tear the overlay down rather than hiding it, so the WebGL context and
+    // its canvas are actually released.
+    glowStop();
+    screenGlow.destroy();
+    screenGlow = null;
+  } else if (!on && settings.screen_glow !== false) {
+    initScreenGlow();
+  }
+}
+
+// Nothing needs to move while the window is in the background. Blur covers a
+// visible-but-unfocused app window; visibilitychange covers a minimised one.
+function syncFocus() {
+  const away = document.hidden || !document.hasFocus();
+  document.documentElement.classList.toggle("unfocused", away);
+  // The shell decides between an in-window card and a Windows toast from this.
+  const shell = window.pywebview && window.pywebview.api;
+  if (shell && shell.focus_changed) shell.focus_changed(!away).catch(() => {});
+}
+// pywebview injects its bridge after load; report once it exists.
+window.addEventListener("pywebviewready", () => syncFocus());
+window.addEventListener("blur", syncFocus);
+window.addEventListener("focus", syncFocus);
+document.addEventListener("visibilitychange", syncFocus);
+syncFocus();
+
+$("lowpower").addEventListener("change", () => {
+  applyLowPower($("lowpower").checked);
+  saveSettings();
+});
+$("testtoast").addEventListener("click", async () => {
+  const out = $("testtoastresult");
+  try {
+    const res = await api("/api/toast/test", { method: "POST", body: "{}" });
+    out.textContent = res.ok ? `\u2713 ${res.note}` : `\u2717 ${res.note}`;
+  } catch {
+    out.textContent = "\u2717 Could not reach the local service";
+  }
+});
+
+["autostart", "nativetoasts"].forEach((id) =>
+  $(id).addEventListener("change", saveSettings));
+$("checkupdates").addEventListener("change", () => {
+  saveSettings();
+  refreshVersion();
+});
+
+/* ---------- version & updates ---------- */
+async function refreshVersion() {
+  const line = $("versionline");
+  try {
+    const v = await api("/api/version");
+    line.replaceChildren();
+    line.append(`GlitchGuard ${v.current}`);
+    if (v.newer && v.url) {
+      const link = el("a", "updatelink", ` - version ${v.latest} is available`);
+      link.href = safeUrl(v.url) || "#";
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      line.append(link);
+    } else if (v.checked && !v.error) {
+      line.append(" - up to date");
+    } else if (v.error) {
+      line.append(` - could not check (${v.error})`);
+    }
+  } catch {
+    line.textContent = "Version unknown";
+  }
+}
+
+/* ---------- export ---------- */
+$("exportcsv").addEventListener("click", async () => {
+  const section = dataSection || "feed";
+  const btn = $("exportcsv");
+  // In the app window, a native Save dialog. In a browser, a plain download.
+  if (window.pywebview && window.pywebview.api && window.pywebview.api.export_csv) {
+    btn.disabled = true;
+    try {
+      const res = await window.pywebview.api.export_csv(section);
+      if (res && res.saved) {
+        $("laststate").textContent = `saved ${res.rows} deals to ${res.name}`;
+      }
+    } finally {
+      btn.disabled = false;
+    }
+    return;
+  }
+  window.location.href = `/api/export.csv?section=${encodeURIComponent(section)}&t=${encodeURIComponent(TOKEN)}`;
+});
 
 async function tick() {
   try {
@@ -1249,6 +1590,11 @@ function saveSettings() {
     glow_style: document.querySelector("#glowstyle .segbtn.on")?.dataset.style || "rainbow",
     glow_color: $("glowcolor").value,
     alert_score: Number($("alertscore").value),
+    alert_sources: selectedAlertSources(),
+    low_power: $("lowpower").checked,
+    autostart: $("autostart").checked,
+    native_toasts: $("nativetoasts").checked,
+    check_updates: $("checkupdates").checked,
     ...selectedSources(),
   };
   api("/api/settings", { method: "POST", body: JSON.stringify(payload) }).catch(() => {});

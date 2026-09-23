@@ -6,14 +6,23 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from . import amazon, config, creators, filters, notify, store
+import csv
+import traceback
+import io
+
+from . import (__version__, amazon, config, creators, filters, notify, store,
+               updates)
 
 TOKEN = secrets.token_urlsafe(24)
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "PriceErrorHunter"
+    server_version = "GlitchGuard"
     poller = None
+    # Set by the desktop shell. None when running in a plain browser, which is
+    # also how the page knows whether to offer the desktop-only settings.
+    on_settings = None
+    desktop = None
 
     def log_message(self, *args):
         pass
@@ -83,6 +92,12 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/status":
                 self._json(self._status())
                 return
+            if path == "/api/version":
+                self._json(updates.status())
+                return
+            if path == "/api/export.csv":
+                self._export_csv(query)
+                return
         self.send_error(404)
 
     def do_POST(self):
@@ -106,7 +121,30 @@ class Handler(BaseHTTPRequestHandler):
             self._json(self.poller.refresh_now())
             return
         if parsed.path == "/api/settings":
-            self._json(config.update(body))
+            cfg = config.update(body)
+            if self.on_settings:
+                # e.g. registering or removing the login item. A failure there
+                # must not lose the save that already happened.
+                try:
+                    self.on_settings(cfg)
+                except Exception:
+                    traceback.print_exc()
+            self._json(cfg)
+            return
+        if parsed.path == "/api/toast/test":
+            self._json(self.desktop.test_toast() if self.desktop
+                       else {"ok": False, "note": "Only in the desktop app"})
+            return
+        if parsed.path == "/api/show":
+            # A second launch asks the running copy to come forward instead of
+            # starting another poller against the same feeds.
+            if self.desktop:
+                self.desktop.show()
+            self._json({"ok": bool(self.desktop)})
+            return
+        if parsed.path == "/api/alerts/clear":
+            store.clear_alerts()
+            self._json({"ok": True})
             return
         if parsed.path == "/api/notify/test":
             self._json(notify.send_test(config.load()))
@@ -156,7 +194,24 @@ class Handler(BaseHTTPRequestHandler):
             "status": self._status(),
             "settings": cfg,
             "categories": filters.category_labels(),
+            # Measured, not assumed: the settings UI prints each source's real
+            # median delay so "alert from this one" is an informed choice.
+            "source_latency": store.source_latency(),
         })
+
+    def _export_csv(self, query):
+        section = query.get("section", ["feed"])[0]
+        if section not in store.SECTIONS:
+            section = "feed"
+        text, _ = export_rows(section)
+        body = text.encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/csv; charset=utf-8")
+        self.send_header("Content-Disposition",
+                         f'attachment; filename="glitchguard-{section}.csv"')
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def _amazon_check(self, deal_id):
         deal = store.get(deal_id) if deal_id else None
@@ -198,10 +253,60 @@ class Handler(BaseHTTPRequestHandler):
         )
         cfg = config.load()
         status["settings"] = cfg
+        status["desktop"] = self.desktop.info() if self.desktop else None
         status["amazon_budget"] = self.poller.checker.budget(cfg)
         # status() deliberately reports only whether keys exist, never the keys.
         status["paapi"] = creators.status()
         return status
+
+
+EXPORT_COLUMNS = (
+    ("title", "Title"), ("retailer", "Retailer"), ("price", "Price"),
+    ("list_price", "List price"), ("discount_pct", "Discount %"),
+    ("savings", "Saving"), ("score", "Score"), ("tier", "Tier"),
+    ("promo_code", "Promo code"), ("source", "Source"), ("asin", "ASIN"),
+    ("age_text", "Posted"), ("alert_reason", "Alert reason"),
+    ("alert_keyword", "Alert keyword"), ("link", "Link"),
+)
+
+
+def export_rows(section):
+    """The same rows the tab shows, as CSV text, so an export never disagrees
+    with what was on screen. Returns (text, row_count)."""
+    if section not in store.SECTIONS:
+        section = "feed"
+    cfg = config.load()
+    keywords = [w for w in (cfg.get("exclude_keywords") or "").split(",") if w.strip()]
+    deals = store.list_deals(
+        section=section, sort=cfg.get("sort", "score"), limit=5000,
+        exclude_categories=cfg.get("excluded_categories") or (),
+        exclude_keywords=keywords, max_age_hours=cfg.get("deal_ttl_hours"),
+    )
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow([label for _, label in EXPORT_COLUMNS])
+    for d in deals:
+        d["link"] = d.get("direct_url") or d.get("out_url") or d.get("url")
+        writer.writerow([_csv_cell(d.get(k)) for k, _ in EXPORT_COLUMNS])
+    # A byte-order mark so Excel opens it as UTF-8 instead of mangling every
+    # trademark sign and curly quote in the product titles.
+    return "\ufeff" + buf.getvalue(), len(deals)
+
+
+def _csv_cell(value):
+    """Plain text for a spreadsheet, defusing formula injection.
+
+    Product titles come from public feeds, and a cell that starts with = + - @
+    is executed by Excel as a formula, so those get a leading apostrophe.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, float):
+        return f"{value:.2f}"
+    text = str(value)
+    if text[:1] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + text
+    return text
 
 
 def serve(poller, port):

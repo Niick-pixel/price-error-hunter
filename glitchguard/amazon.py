@@ -85,12 +85,20 @@ class AmazonChecker:
         if budget["left"] <= 0:
             return {"status": "capped", "note": "Hourly check limit reached"}
 
+        # Reserve the next slot under the lock, then wait for it outside.
+        # This used to sleep while holding the lock, and budget() - called on
+        # every status poll - needs the same lock, so each spaced-out check
+        # froze /api/status for up to 30 seconds. Alerts reach the page
+        # through that endpoint, so they froze with it.
         with self._lock:
-            wait = cfg["amazon_min_gap"] - (time.time() - self._last)
-            if wait > 0:
-                time.sleep(min(wait, 30))
-            self._last = time.time()
-            self._recent.append(self._last)
+            now = time.time()
+            slot = max(now, self._last + cfg["amazon_min_gap"])
+            slot = min(slot, now + 30)
+            self._last = slot
+            self._recent.append(slot)
+        wait = slot - time.time()
+        if wait > 0:
+            time.sleep(wait)
 
         url = f"https://www.amazon.com/dp/{asin}"
         try:

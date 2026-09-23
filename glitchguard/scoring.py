@@ -91,6 +91,23 @@ def score(deal):
         points += 8
         reasons.append(f"Dropped from ${prev:.2f} since we first saw it")
 
+    # Against this product's own past. Filled in by the poller from the
+    # price_history table: hist_low and hist_median are over sightings that
+    # came from other deal posts, so a deal never counts as its own history.
+    # Needs at least two earlier sightings - one prior price is an anecdote.
+    hist_n = deal.get("hist_n") or 0
+    hist_low = deal.get("hist_low")
+    hist_median = deal.get("hist_median")
+    if hist_n >= 2 and price and hist_low:
+        if price < hist_low * 0.97:
+            points += 8
+            reasons.append(f"Lowest price seen for this product "
+                           f"(previous low ${hist_low:,.2f}, {hist_n} sightings)")
+        if hist_median and price <= hist_median * 0.6:
+            below = round((1 - price / hist_median) * 100)
+            points += 10
+            reasons.append(f"{below}% below its usual ${hist_median:,.2f}")
+
     if (deal.get("retailer") or "").strip().lower() == "amazon":
         points += 4
 

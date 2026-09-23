@@ -34,6 +34,16 @@ CREATE TABLE IF NOT EXISTS deals (
 CREATE INDEX IF NOT EXISTS idx_deals_score ON deals(score DESC);
 CREATE INDEX IF NOT EXISTS idx_deals_seen ON deals(first_seen DESC);
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
+-- Every price a product has been seen at. The deals table keeps one row per
+-- deal post with only its latest price, so the same product listed again next
+-- week would otherwise leave no trace of what it cost this week.
+CREATE TABLE IF NOT EXISTS price_history (
+    asin     TEXT NOT NULL,
+    price    REAL NOT NULL,
+    seen_at  REAL NOT NULL,
+    deal_id  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_hist_asin ON price_history(asin);
 """
 
 # Columns added after the first release; applied to existing databases on open.
@@ -43,6 +53,13 @@ MIGRATIONS = (
     ("category", "TEXT"),
     ("hidden", "INTEGER DEFAULT 0"),
     ("promo_code", "TEXT"),
+    # Alert history. "alerted" existed in databases from an older build but was
+    # never in this list, so a fresh install did not get it and nothing ever
+    # wrote to it. Declared here so both cases end up with the column.
+    ("alerted", "INTEGER DEFAULT 0"),
+    ("alert_reason", "TEXT"),
+    ("alert_keyword", "TEXT"),
+    ("alerted_at", "REAL"),
     ("direct_url", "TEXT"),
     ("asin", "TEXT"),
     ("amz_price", "REAL"),
@@ -79,6 +96,20 @@ def _migrate(db):
             continue  # already correct; leave it alone
         db.execute("UPDATE deals SET posted_at=? WHERE id=?", (posted, row["id"]))
 
+    # Seed price history from what the deals table already knows, once. Each
+    # row contributes its current price, and its previous one when it moved.
+    if not db.execute("SELECT 1 FROM price_history LIMIT 1").fetchone():
+        db.execute(
+            "INSERT INTO price_history (asin, price, seen_at, deal_id)"
+            " SELECT asin, price, COALESCE(posted_at, first_seen), id FROM deals"
+            " WHERE asin IS NOT NULL AND asin<>'' AND price > 0"
+        )
+        db.execute(
+            "INSERT INTO price_history (asin, price, seen_at, deal_id)"
+            " SELECT asin, prev_price, first_seen, id FROM deals"
+            " WHERE asin IS NOT NULL AND asin<>'' AND prev_price > 0"
+        )
+
     # Classify rows stored before categories existed.
     for row in db.execute(
         "SELECT id, title, asin, price, list_price FROM deals WHERE category IS NULL"
@@ -88,14 +119,25 @@ def _migrate(db):
     db.commit()
 
 
-def _posted_at(age_text, now):
-    """Turn '12 min ago' into an absolute timestamp.
+def _posted_at(item, now):
+    """The deal's posting time, preferring the feed's own exact timestamp.
 
     Sorting on first_seen is unreliable because a cold start inserts every deal
-    in one cycle, leaving them all tied. Every feed reports an age, so derive a
-    real posting time from it instead.
+    in one cycle, leaving them all tied, so a real posting time is needed.
+
+    RSS carries an exact pubDate and the sources now pass it straight through.
+    Deriving it from age_text is the fallback for the scraped listing, which
+    only ever publishes wording like "2 hr ago" - and that path is lossy, since
+    everything from 60 to 119 minutes collapses onto the same value.
+
+    A feed clock that is ahead of ours would otherwise produce a deal posted in
+    the future, which reads as "0 min ago" forever and sorts above everything,
+    so anything later than now is clamped.
     """
-    minutes = scoring.age_minutes(age_text)
+    exact = item.get("posted_at")
+    if isinstance(exact, (int, float)) and exact > 0:
+        return min(float(exact), now)
+    minutes = scoring.age_minutes(item.get("age_text"))
     return now - minutes * 60 if minutes is not None else now
 
 
@@ -142,6 +184,15 @@ def upsert_listing(items, source="hiddenclearances"):
         row = db.execute(
             "SELECT id, price FROM deals WHERE id=?", (item["id"],)
         ).fetchone()
+        if item.get("asin") and item.get("price") and (
+                row is None or row["price"] != item["price"]):
+            # Only on first sight or a real change, so a deal sitting in a feed
+            # for a week does not write a row every two minutes.
+            db.execute(
+                "INSERT INTO price_history (asin, price, seen_at, deal_id)"
+                " VALUES (?,?,?,?)",
+                (item["asin"], item["price"], now, item["id"]),
+            )
         if row is None:
             fresh.append(item["id"])
             db.execute(
@@ -154,7 +205,7 @@ def upsert_listing(items, source="hiddenclearances"):
                     item["id"], item["url"], item["title"], item["retailer"],
                     item["price"], item["list_price"], item["discount_pct"],
                     item["savings"], item["image"], item["age_text"], now, now,
-                    _posted_at(item.get("age_text"), now),
+                    _posted_at(item, now),
                     filters.classify(item),
                     # Feed descriptions are where promo codes live, so both the
                     # text and the extracted code are stored at ingest.
@@ -183,7 +234,7 @@ def upsert_listing(items, source="hiddenclearances"):
                     item["image"], item["age_text"], now,
                     # Set once and keep: age_text drifts every poll, so
                     # recomputing would make the posting time wander.
-                    _posted_at(item.get("age_text"), now),
+                    _posted_at(item, now),
                     # Recomputed every refresh so rows classified under older
                     # rules pick up improvements instead of staying stale.
                     filters.classify(item),
@@ -329,7 +380,7 @@ def get(deal_id):
     return _to_dict(row) if row else None
 
 
-SECTIONS = ("feed", "amazon", "woot", "walmart")
+SECTIONS = ("feed", "amazon", "woot", "walmart", "alerts")
 
 
 def in_section(deal, section):
@@ -343,6 +394,10 @@ def in_section(deal, section):
         # Amazon product, so a known ASIN is proof enough.
         return ((deal.get("retailer") or "").lower() == "amazon"
                 or bool(deal.get("asin")))
+    if section == "alerts":
+        # A flag rather than a property of the deal: this tab is a record of
+        # what interrupted you, not a category of product.
+        return bool(deal.get("alerted"))
     if section in ("woot", "walmart"):
         blob = " ".join([
             deal.get("retailer") or "", deal.get("direct_url") or "",
@@ -358,6 +413,11 @@ def list_deals(section="feed", min_discount=0, sort="score", limit=300,
     # here, so there is exactly one definition of "hidden" shared with alerts.
     where = ["gone=0", "hidden=0"]
     args = []
+    if section == "alerts":
+        # Filtered in SQL as well as in in_section so the age cap below can be
+        # skipped without scanning the whole table.
+        where.append("alerted=1")
+        max_age_hours = None
     if max_age_hours:
         # Applied here as well as in the expiry job so the setting bites the
         # moment it is changed, instead of waiting for the next poll, and so
@@ -376,6 +436,10 @@ def list_deals(section="feed", min_discount=0, sort="score", limit=300,
         "discount_asc": "discount_pct ASC, savings ASC",
         "savings": "savings DESC",
     }.get(sort, "score DESC, posted_at DESC")
+    if section == "alerts":
+        # Most recently notified first. Reviewing alerts is a chronological
+        # task, so the listing sort does not apply here.
+        order = "alerted_at DESC, posted_at DESC"
     args.append(limit)
     rows = conn().execute(
         f"SELECT * FROM deals WHERE {' AND '.join(where)} ORDER BY {order} LIMIT ?",
@@ -388,6 +452,47 @@ def list_deals(section="feed", min_discount=0, sort="score", limit=300,
         if in_section(d, section)
         and not filters.suppressed(d, exclude_categories, exclude_keywords)
     ]
+
+
+def price_history_by_asin(asins):
+    """{asin: [(deal_id, price), ...]} for the given products, in one query."""
+    asins = [a for a in set(asins) if a]
+    if not asins:
+        return {}
+    out = {}
+    for chunk in range(0, len(asins), 500):
+        part = asins[chunk:chunk + 500]
+        for row in conn().execute(
+            f"SELECT asin, deal_id, price FROM price_history"
+            f" WHERE asin IN ({','.join('?' * len(part))})", part,
+        ):
+            out.setdefault(row["asin"], []).append((row["deal_id"], row["price"]))
+    return out
+
+
+def mark_alerted(deal_id, reason, keyword=""):
+    """Record that a deal raised a notification, and why.
+
+    Written once per deal: a find that is re-alerted keeps the moment it first
+    interrupted you, which is what the history is for.
+    """
+    db = conn()
+    db.execute(
+        "UPDATE deals SET alerted=1, alert_reason=?, alert_keyword=?,"
+        " alerted_at=COALESCE(alerted_at, ?) WHERE id=?",
+        (reason, keyword or "", time.time(), deal_id),
+    )
+    db.commit()
+
+
+def clear_alerts():
+    """Empty the alert history without touching the deals themselves."""
+    db = conn()
+    db.execute(
+        "UPDATE deals SET alerted=0, alert_reason=NULL, alert_keyword=NULL,"
+        " alerted_at=NULL WHERE alerted=1"
+    )
+    db.commit()
 
 
 def hide_deal(deal_id):
@@ -404,6 +509,42 @@ def clear_new_flags(ids):
         f"UPDATE deals SET is_new=0 WHERE id IN ({','.join('?' * len(ids))})", ids
     )
     db.commit()
+
+
+def source_latency(days=3, min_rows=4):
+    """Median minutes between a deal being posted and us first seeing it.
+
+    Publisher lag and our own poll gap combined - the figure that decides
+    whether an alert from a source can honestly be called fresh. Measured from
+    real rows rather than assumed, so it tracks each feed as it actually
+    behaves and the settings UI can show it next to the toggle.
+
+    Rows where posted_at was derived from coarse wording are still included:
+    they bias a slow source slightly slower, never a fast one slower, so the
+    ranking this is used for holds.
+    """
+    cutoff = time.time() - days * 86400
+    rows = conn().execute(
+        "SELECT source, posted_at, first_seen FROM deals"
+        " WHERE posted_at IS NOT NULL AND first_seen IS NOT NULL"
+        "   AND first_seen > ? AND source IS NOT NULL",
+        (cutoff,),
+    ).fetchall()
+    buckets = {}
+    for row in rows:
+        lag = (row["first_seen"] - row["posted_at"]) / 60.0
+        if lag >= 0:
+            buckets.setdefault(row["source"], []).append(lag)
+    out = {}
+    for name, values in buckets.items():
+        if len(values) < min_rows:
+            continue
+        values.sort()
+        mid = len(values) // 2
+        median = (values[mid] if len(values) % 2
+                  else (values[mid - 1] + values[mid]) / 2)
+        out[name] = round(median, 1)
+    return out
 
 
 def age_label(posted_at):

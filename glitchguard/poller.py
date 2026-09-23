@@ -41,6 +41,9 @@ class Poller:
             "notify_error": None,
         }
         self._backoff = 0.0
+        # Called with (payload, kind) whenever an alert is raised. The desktop
+        # shell uses it for Windows toasts; nothing is attached in a browser.
+        self.on_alert = None
 
     def start(self):
         # Repair rows retired by the old absence rule that are still within the
@@ -240,7 +243,17 @@ class Poller:
             store.save_amazon(deal_id, result, tag, note)
 
     def _rescore(self):
-        for deal in store.list_deals(limit=500):
+        deals = store.list_deals(limit=500)
+        history = store.price_history_by_asin(d.get("asin") for d in deals)
+        for deal in deals:
+            # This deal's own sightings are excluded, so re-listing a product
+            # at the same price is not mistaken for it beating its history.
+            past = sorted(p for did, p in history.get(deal.get("asin"), ())
+                          if did != deal["id"])
+            if past:
+                deal["hist_n"] = len(past)
+                deal["hist_low"] = past[0]
+                deal["hist_median"] = past[len(past) // 2]
             value, tier, reasons = scoring.score(deal)
             if value != deal.get("score") or tier != deal.get("tier"):
                 store.save_score(deal["id"], value, tier, reasons)
@@ -275,6 +288,11 @@ class Poller:
         # for; hiding it behind a freshness rule would defeat the point.
         pinned = filters.parse_watchlist(cfg.get("watchlist"))
 
+        # A missing key means "every source", so upgrading does not silently
+        # mute anything; an explicit empty list genuinely means none.
+        raw_sources = cfg.get("alert_sources")
+        alert_sources = None if raw_sources is None else set(raw_sources)
+
         fresh = []
         for deal in (store.get(i) for i in fresh_ids):
             if not deal or filters.suppressed(deal, cats, words):
@@ -286,6 +304,8 @@ class Poller:
             if oldest_listed and posted(deal) < oldest_listed:
                 continue
             if oldest_alertable and posted(deal) < oldest_alertable:
+                continue
+            if alert_sources is not None and deal.get("source") not in alert_sources:
                 continue
             fresh.append(deal)
         if not fresh:
@@ -304,6 +324,8 @@ class Poller:
             self.status["watch_ping"] += 1
             self.status["watch_hit"] = self._alert_payload(pin, pin["title"], pinned=True)
             self._send_outbound(cfg, pin, "Pinned product")
+            store.mark_alerted(pin["id"], "pinned")
+            self._emit(self.status["watch_hit"], "pinned")
             watch_id = pin["id"]
         else:
             watch_id = self._note_watch(cfg, fresh)
@@ -311,6 +333,12 @@ class Poller:
                 hit = next((d for d in fresh if d["id"] == watch_id), None)
                 if hit:
                     self._send_outbound(cfg, hit, "Watched keyword")
+                    self._emit(self.status["watch_hit"], "keyword")
+                    store.mark_alerted(
+                        hit["id"], "keyword",
+                        filters.watch_match(hit, filters.parse_keywords(
+                            cfg.get("watch_keywords"))),
+                    )
 
         banner_id = best["id"] if best and best["score"] >= cfg["alert_score"] else None
         self._note_sound_only(cfg, fresh, banner_id, watch_id)
@@ -318,6 +346,7 @@ class Poller:
         if best and best["score"] >= cfg["alert_score"]:
             if best["id"] != watch_id:
                 self._send_outbound(cfg, best, "Possible price error")
+                store.mark_alerted(best["id"], "score")
             self.status["top_new"] = {
                 "title": best["title"],
                 "score": best["score"],
@@ -329,7 +358,18 @@ class Poller:
                 "price": best.get("price"),
                 "discount_pct": best.get("discount_pct"),
                 "image": best.get("image") or "",
+                "source": best.get("source") or "",
+                "age_minutes": self._age_minutes(best),
             }
+            if best["id"] != watch_id:
+                self._emit(self.status["top_new"], "score")
+
+    def _emit(self, payload, kind):
+        if self.on_alert and payload:
+            try:
+                self.on_alert(dict(payload), kind)
+            except Exception:
+                traceback.print_exc()
 
     def _alert_payload(self, deal, keyword, pinned=False):
         return {
@@ -342,7 +382,20 @@ class Poller:
             "price": deal.get("price"),
             "discount_pct": deal.get("discount_pct"),
             "image": deal.get("image") or "",
+            # Which feed carried it and how old it already was. Most of the gap
+            # between a deal going up and this alert firing belongs to the
+            # publisher, not to us, and saying so turns an apparent bug into a
+            # fact the user can act on - by muting the slow source.
+            "source": deal.get("source") or "",
+            "age_minutes": self._age_minutes(deal),
         }
+
+    @staticmethod
+    def _age_minutes(deal):
+        posted = deal.get("posted_at") or deal.get("first_seen")
+        if not posted:
+            return None
+        return max(0, int((time.time() - posted) / 60))
 
     def _send_outbound(self, cfg, deal, reason):
         """Push to Discord/Telegram off-thread; a slow webhook must not stall polling."""
